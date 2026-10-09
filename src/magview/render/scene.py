@@ -1,0 +1,216 @@
+"""Draw a ``SceneModel`` into a pyvista plotter (onscreen or offscreen, no Qt).
+
+``StructureScene`` owns the actors for one structure: atoms (one glyph actor),
+bonds (one tube actor), unit cell, moment arrows and an a/b/c axes triad in a
+corner overlay. The GUI and the offscreen renderer both use this class.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pyvista as pv
+import vtk
+
+from magview.render.arrows import ArrowStyle, arrow_colors, arrow_geometry
+from magview.render.camera import fit_parallel_scale, view_basis
+from magview.render.model import SceneModel
+from magview.style.theme import RenderTheme
+
+DEFAULT_SPIN_AXIS = np.array([0.0, 0.0, 1.0])
+
+
+def _to_uint8(rgb: np.ndarray) -> np.ndarray:
+    return np.clip(np.rint(np.asarray(rgb) * 255), 0, 255).astype(np.uint8)
+
+
+class StructureScene:
+    def __init__(self, plotter: pv.Plotter, theme: RenderTheme, flat_shading: bool = False,
+                 show_axes: bool = True, show_cell: bool = True) -> None:
+        self.plotter = plotter
+        self.theme = theme
+        self.flat = flat_shading  # unlit colors; used by color-accuracy tests
+        self.show_axes = show_axes
+        self.show_cell = show_cell
+        self.model: SceneModel | None = None
+        self.actors: dict[str, object] = {}
+        self._triad: AxesTriad | None = None
+        self._view = "oblique"
+        plotter.set_background(theme.background)
+        self._setup_lighting()
+
+    # -- lighting --------------------------------------------------------------
+    def _setup_lighting(self) -> None:
+        self.plotter.remove_all_lights()
+        # VESTA LIGHT0: one light fixed to the viewer, shining along the view direction.
+        light = pv.Light(light_type="headlight", intensity=1.0)
+        self.plotter.add_light(light)
+
+    def _material(self) -> dict:
+        if self.flat:
+            return dict(ambient=1.0, diffuse=0.0, specular=0.0, lighting=True)
+        t = self.theme
+        return dict(ambient=t.ambient, diffuse=t.diffuse, specular=t.specular,
+                    specular_power=t.specular_power, smooth_shading=True)
+
+    # -- content ----------------------------------------------------------------
+    def set_model(self, model: SceneModel, reset_camera: bool = True) -> None:
+        for name in list(self.actors):
+            self.plotter.remove_actor(self.actors.pop(name), render=False)
+        self.model = model
+        t = self.theme
+
+        if len(model.atoms):
+            opacity = model.atom_opacity if model.atom_opacity is not None else np.ones(len(model.atoms))
+            sphere = pv.Sphere(radius=1.0, theta_resolution=t.sphere_resolution * 2,
+                               phi_resolution=t.sphere_resolution)
+            # One actor per opacity level (VTK sorts translucent geometry per actor).
+            for level in np.unique(opacity)[::-1]:
+                sel = np.nonzero(opacity == level)[0]
+                cloud = pv.PolyData(model.atoms.cart[sel])
+                cloud["radius"] = model.atom_radius[sel]
+                cloud["rgb"] = _to_uint8(model.atom_rgb[sel])
+                cloud["display_index"] = sel
+                glyphs = cloud.glyph(geom=sphere, scale="radius", orient=False, factor=1.0)
+                name = "atoms" if level == 1.0 else f"atoms_{level:.2f}"
+                self.actors[name] = self.plotter.add_mesh(
+                    glyphs, scalars="rgb", rgb=True, name=name, opacity=float(level),
+                    **self._material())
+
+        if len(model.bond_segments):
+            n = len(model.bond_segments)
+            lines = pv.PolyData()
+            lines.points = model.bond_segments.reshape(-1, 3)
+            lines.lines = np.column_stack([np.full(n, 2), 2 * np.arange(n), 2 * np.arange(n) + 1]).ravel()
+            lines.cell_data["rgb"] = _to_uint8(model.bond_rgb)
+            tubes = lines.tube(radius=t.bond_radius, n_sides=t.bond_sides, capping=False)
+            self.actors["bonds"] = self.plotter.add_mesh(
+                tubes, scalars="rgb", rgb=True, name="bonds", **self._material())
+
+        if self.show_cell:
+            edges = pv.PolyData()
+            edges.points = model.cell_edges.reshape(-1, 3)
+            edges.lines = np.column_stack([np.full(12, 2), 2 * np.arange(12),
+                                           2 * np.arange(12) + 1]).ravel()
+            self.actors["cell"] = self.plotter.add_mesh(
+                edges, color=t.cell_line_color, line_width=t.cell_line_width, lighting=False,
+                name="cell")
+
+        self.set_moments(model.moments)
+
+        if self.show_axes:
+            if self._triad is None:
+                self._triad = AxesTriad(self.plotter, t)
+            self._triad.set_lattice(model.lattice)
+        if reset_camera:
+            self.set_view(self._view)
+
+    def set_moments(self, moments: np.ndarray | None, spin_axis: np.ndarray = DEFAULT_SPIN_AXIS,
+                    style: ArrowStyle | None = None) -> None:
+        """(Re)draw arrows for per-displayed-atom Cartesian moments (mu_B)."""
+        if "arrows" in self.actors:
+            self.plotter.remove_actor(self.actors.pop("arrows"), render=False)
+        if self.model is None or moments is None:
+            return
+        self.model.moments = np.asarray(moments, dtype=float)
+        style = style or ArrowStyle.from_theme(self.theme)
+        points, faces, idx = arrow_geometry(self.model.atoms.cart, self.model.moments, style)
+        if len(points) == 0:
+            return
+        t = self.theme
+        rgb = arrow_colors(self.model.moments, spin_axis, t.spin_up_color, t.spin_down_color,
+                           t.arrow_neutral_color)
+        mesh = pv.PolyData(points, faces)
+        mesh["rgb"] = _to_uint8(rgb[idx])
+        mesh = mesh.compute_normals(split_vertices=True, feature_angle=50.0, auto_orient_normals=False)
+        self.actors["arrows"] = self.plotter.add_mesh(
+            mesh, scalars="rgb", rgb=True, name="arrows", **self._material())
+
+    # -- camera -----------------------------------------------------------------
+    def set_view(self, view: str = "oblique") -> None:
+        if self.model is None:
+            return
+        self._view = view
+        d, up = view_basis(self.model.lattice, view)
+        center = self.model.center
+        cam = self.plotter.camera
+        dist = 10.0 * float(np.linalg.norm(self.model.lattice, axis=1).max())
+        cam.focal_point = tuple(center)
+        cam.position = tuple(center + dist * d)
+        cam.up = tuple(up)
+        cam.parallel_projection = self.theme.parallel_projection
+        w, h = self.plotter.window_size
+        pts = self.model.all_points()
+        if self.model.moments is not None:
+            style = ArrowStyle.from_theme(self.theme)
+            half = 0.5 * np.linalg.norm(self.model.moments, axis=1, keepdims=True) * style.scale
+            m_dir = np.divide(self.model.moments, np.linalg.norm(self.model.moments, axis=1, keepdims=True),
+                              out=np.zeros_like(self.model.moments), where=half > 0)
+            pts = np.vstack([pts, self.model.atoms.cart + half * m_dir, self.model.atoms.cart - half * m_dir])
+        cam.parallel_scale = fit_parallel_scale(pts, center, d, up, w / h)
+        if not self.theme.parallel_projection:
+            self.plotter.reset_camera()
+        self.plotter.renderer.ResetCameraClippingRange()
+
+
+class AxesTriad:
+    """a/b/c arrows in a bottom-left overlay whose camera follows the main camera."""
+
+    def __init__(self, plotter: pv.Plotter, theme: RenderTheme, size: float = 0.2) -> None:
+        self.plotter = plotter
+        self.theme = theme
+        self.renderer = vtk.vtkRenderer()
+        self.renderer.SetViewport(0.0, 0.0, size, size)
+        self.renderer.SetLayer(1)
+        self.renderer.InteractiveOff()
+        self.renderer.GetActiveCamera().ParallelProjectionOn()
+        rw = plotter.render_window
+        rw.SetNumberOfLayers(max(2, rw.GetNumberOfLayers()))
+        rw.AddRenderer(self.renderer)
+        plotter.renderer.AddObserver("StartEvent", self._sync)
+        self._actors: list[vtk.vtkProp] = []
+
+    def set_lattice(self, lattice: np.ndarray) -> None:
+        for a in self._actors:
+            self.renderer.RemoveViewProp(a)
+        self._actors = []
+        for i, (vec, name) in enumerate(zip(lattice, "abc")):
+            u = vec / np.linalg.norm(vec)
+            arrow = pv.Arrow(start=(0, 0, 0), direction=u, scale=1.0, tip_length=0.25,
+                             tip_radius=0.08, shaft_radius=0.03)
+            mapper = vtk.vtkPolyDataMapper()
+            mapper.SetInputData(arrow)
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            prop = actor.GetProperty()
+            prop.SetColor(*self.theme.axis_colors[i])
+            prop.SetAmbient(0.3)
+            prop.SetDiffuse(0.7)
+            self.renderer.AddActor(actor)
+            label = vtk.vtkBillboardTextActor3D()
+            label.SetInput(name)
+            label.SetPosition(*(1.28 * u))
+            tp = label.GetTextProperty()
+            tp.SetFontSize(18)
+            tp.SetBold(True)
+            tp.SetColor(*self.theme.axis_colors[i])
+            tp.SetJustificationToCentered()
+            tp.SetVerticalJustificationToCentered()
+            self.renderer.AddActor(label)
+            self._actors += [actor, label]
+        light = vtk.vtkLight()
+        light.SetLightTypeToHeadlight()
+        self.renderer.RemoveAllLights()
+        self.renderer.AddLight(light)
+
+    def _sync(self, *_args) -> None:
+        main = self.plotter.renderer.GetActiveCamera()
+        cam = self.renderer.GetActiveCamera()
+        pos = np.array(main.GetPosition())
+        foc = np.array(main.GetFocalPoint())
+        d = pos - foc
+        d /= np.linalg.norm(d)
+        cam.SetFocalPoint(0.0, 0.0, 0.0)
+        cam.SetPosition(*(5.0 * d))
+        cam.SetViewUp(*main.GetViewUp())
+        cam.SetParallelScale(1.55)
+        self.renderer.ResetCameraClippingRange()

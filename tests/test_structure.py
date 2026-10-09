@@ -1,0 +1,81 @@
+"""Structure loading and symmetry."""
+
+import numpy as np
+import pytest
+from pymatgen.core import Lattice, Structure
+
+from magview.core.structure import CrystalStructure, DisorderedStructureError, StructureLoadError
+
+EXPECTED_SG = {
+    "Fe_bcc": (229, "Im-3m"),
+    "NiO": (225, "Fm-3m"),
+    "La2CuO4": (139, "I4/mmm"),
+    "FeSe": (129, "P4/nmm"),
+    "Cs3V9Te13_300K": (189, "P-62m"),
+    "toy_square_CuO2": (123, "P4/mmm"),
+    "toy_honeycomb_Cr": (191, "P6/mmm"),
+    "toy_triangular_Co": (191, "P6/mmm"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_SG))
+def test_space_groups(load, name):
+    c = load(name)
+    assert (c.symmetry.number, c.symmetry.international) == EXPECTED_SG[name]
+    assert np.all((c.frac_coords >= 0) & (c.frac_coords < 1))
+
+
+def test_cs3v9te13_experimental_cif(load):
+    c = load("Cs3V9Te13_300K")
+    comp, z = c.structure.composition.get_reduced_composition_and_factor()
+    assert comp.reduced_formula == "Cs3V9Te13" and z == 1
+    assert len(c) == 25
+    lat = c.structure.lattice
+    assert (lat.a, lat.c, lat.gamma) == pytest.approx((10.089, 8.212, 120.0))
+    # CIF labels survive symmetry expansion.
+    assert sorted(set(c.labels)) == ["Cs1", "Te1", "Te2", "Te3", "V1", "V2"]
+    assert c.labels.count("V1") == 3 and c.labels.count("V2") == 6
+    v = [i for i, s in enumerate(c.symbols) if s == "V"]
+    assert np.allclose(c.frac_coords[v, 2], 0.5)  # single V layer at z = 1/2
+    by_label = {lab: c.symmetry.wyckoffs[c.labels.index(lab)] for lab in set(c.labels)}
+    assert by_label == {"Cs1": "f", "V1": "g", "V2": "k", "Te1": "h", "Te2": "i", "Te3": "g"}
+    # V1 and V2 are distinct orbits.
+    eq = np.array(c.symmetry.equivalent_atoms)
+    assert len(set(eq[v])) == 2
+
+
+def test_primitive_lattice_of_centered_cell(load):
+    c = load("NiO")  # fcc: primitive volume = conventional / 4
+    vol_prim = abs(np.linalg.det(c.symmetry.primitive_lattice))
+    assert vol_prim == pytest.approx(c.structure.volume / 4)
+
+
+def test_disordered_rejected():
+    s = Structure(Lattice.cubic(4.0), [{"Fe": 0.5, "Co": 0.5}], [[0, 0, 0]])
+    with pytest.raises(DisorderedStructureError):
+        CrystalStructure.from_pymatgen(s)
+
+
+def test_missing_file(tmp_path):
+    with pytest.raises(StructureLoadError):
+        CrystalStructure.from_file(tmp_path / "nope.cif")
+
+
+def test_garbage_file(tmp_path):
+    p = tmp_path / "bad.cif"
+    p.write_text("this is not a cif\n")
+    with pytest.raises(StructureLoadError):
+        CrystalStructure.from_file(p)
+
+
+def test_poscar_roundtrip(load, tmp_path):
+    p = tmp_path / "POSCAR"
+    load("NiO").structure.to(filename=str(p), fmt="poscar")
+    c = CrystalStructure.from_file(p)
+    assert c.symmetry.number == 225 and len(c) == 8
+
+
+def test_wraps_coordinates():
+    s = Structure(Lattice.cubic(3.0), ["Fe"], [[1.0, -0.25, 2.5]])
+    c = CrystalStructure.from_pymatgen(s)
+    assert np.allclose(c.frac_coords, [[0.0, 0.75, 0.5]])

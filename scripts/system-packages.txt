@@ -1,0 +1,50 @@
+# System (Debian/Ubuntu 24.04) packages required by MagView in a headless container.
+# Single source of truth: read by scripts/setup_system_deps.sh and mirrored into
+# the sandbox image Dockerfile. One package per line; '#' starts a comment.
+
+# --- Python ---
+python3.12-venv            # venv + ensurepip for magview/.venv
+
+# --- OpenGL / offscreen rendering (VTK) ---
+libosmesa6                 # OSMesa: VTK offscreen rendering without a display
+libgl1                     # libGL (GLVND), linked by VTK and QtGui
+libegl1                    # libEGL (GLVND), linked by QtGui
+libopengl0                 # libOpenGL (GLVND), linked by QtGui
+libgl1-mesa-dri            # Mesa llvmpipe driver for GLX under Xvfb
+libglx-mesa0               # Mesa GLX vendor library
+
+# --- X11 client libraries (VTK X backend, Qt xcb platform) ---
+libx11-6
+libx11-xcb1
+libxext6
+libxrender1
+libxt6t64
+libxcursor1
+libxi6
+libxrandr2
+
+# --- Qt 6 runtime (PySide6 wheels) ---
+libglib2.0-0t64
+libfontconfig1
+libfreetype6
+libdbus-1-3
+libxkbcommon0
+libxkbcommon-x11-0
+libxcb1
+libxcb-cursor0
+libxcb-icccm4
+libxcb-image0
+libxcb-keysyms1
+libxcb-randr0
+libxcb-render-util0
+libxcb-shape0
+libxcb-xinerama0
+libxcb-xkb1
+libxcb-xfixes0
+libxcb-shm0
+libxcb-sync1
+libxcb-render0
+
+# --- Virtual display for GUI smoke tests ---
+xvfb
+xauth                      # required by xvfb-run

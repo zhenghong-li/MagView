@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "magview"
+version = "0.0.1"
+description = "Real-time crystal structure editor with an interactive magnetic-ordering workflow"
+readme = "README.md"
+requires-python = ">=3.11"
+# Exact versions are pinned in requirements.txt; these are the direct dependencies.
+dependencies = [
+    "numpy",
+    "pymatgen",
+    "spglib",
+    "vtk",
+    "pyvista",
+    "PySide6-Essentials",
+    "pyvistaqt",
+    "QtPy",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+magview = "magview.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "render: needs an offscreen OpenGL context (OSMesa/EGL)",
+    "gui: needs Xvfb and launches the Qt GUI in a subprocess",
+    "vesta: needs a local VESTA installation (elements.ini/style.ini)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pymatgen.*",
+]
