@@ -39,14 +39,18 @@ from magview.core.batch import PatternOption, pattern_options  # noqa: E402
 from magview.core.canvas import CanvasResizeError  # noqa: E402
 from magview.core.document import MagDocument, NonCollinearError  # noqa: E402
 from magview.core.graph import neighbor_graph  # noqa: E402
+from magview.core.layers import LayerDecomposition, decompose  # noqa: E402
+from magview.core.patterns import MatchResult, match_layer  # noqa: E402
 from magview.core.selection import apply_selection  # noqa: E402
 from magview.core.structure import CrystalStructure, StructureLoadError  # noqa: E402
 from magview.core.suggest import ElementRuleSuggester  # noqa: E402
+from magview.gui.panels.layer_panel import LayerPanel  # noqa: E402
 from magview.gui.panels.moment_panel import MomentPanel  # noqa: E402
 from magview.gui.panels.suggestion_panel import SuggestionPanel  # noqa: E402
 from magview.gui.viewport import EditorViewport, ViewportCallbacks  # noqa: E402
 from magview.render.arrows import ArrowStyle  # noqa: E402
 from magview.render.camera import VIEWS  # noqa: E402
+from magview.render.layer_view import LayerScene  # noqa: E402
 from magview.render.model import build_scene_model, subcell_edges  # noqa: E402
 from magview.render.overlay import CursorLabel  # noqa: E402
 from magview.render.picking import display_ray  # noqa: E402
@@ -86,7 +90,8 @@ class _ViewportKeys(QObject):
             if not event.isAutoRepeat() and LOCK_KEYS.get(key) == self.w.axis_lock:
                 self.w.axis_lock = None
                 self.w._refresh_drag()
-            return key in LOCK_KEYS or key in (Qt.Key_M, Qt.Key_F, Qt.Key_0, Qt.Key_P, Qt.Key_E)
+            return key in LOCK_KEYS or key in (Qt.Key_M, Qt.Key_L, Qt.Key_F, Qt.Key_0, Qt.Key_P,
+                                               Qt.Key_E, Qt.Key_PageUp, Qt.Key_PageDown)
         if event.isAutoRepeat():
             return True
         if self.w._drag is not None and key in LOCK_KEYS:
@@ -97,6 +102,12 @@ class _ViewportKeys(QObject):
             self.w._arm_box()
         elif key == Qt.Key_M:
             self.w.toggle_moment_mode()
+        elif key == Qt.Key_L:
+            self.w.toggle_layer_mode()
+        elif key == Qt.Key_PageDown:
+            self.w.step_layer(1)
+        elif key == Qt.Key_PageUp:
+            self.w.step_layer(-1)
         elif key == Qt.Key_F:
             self.w.flip_selection()
         elif key == Qt.Key_0:
@@ -122,6 +133,11 @@ class MainWindow(QMainWindow):
         self.axis_lock: str | None = None
         self._drag: DragState | None = None
         self._drag_pos: tuple | None = None
+        self.layers: LayerDecomposition | None = None
+        self.layer_axis = "c"
+        self.current_layer = 0
+        self.layer_match: MatchResult | None = None
+        self._main_dirty = False
         self.autosave_enabled = os.environ.get(project.ENV_AUTOSAVE_DIR, "") != "off"
         self.suggester = ElementRuleSuggester()
         self.settings = QSettings("MagView", "MagView")
@@ -137,6 +153,7 @@ class MainWindow(QMainWindow):
             mode_changed=self._on_mode_changed, drag=self._on_drag,
             context_menu=self._context_menu), self.appearance.theme)
         self.cursor_label = CursorLabel(self.viewport.renderer)
+        self.layer_scene = LayerScene(self.viewport, self.appearance.theme)
         self._keys = _ViewportKeys(self)
         self.viewport.installEventFilter(self._keys)
 
@@ -173,13 +190,19 @@ class MainWindow(QMainWindow):
         self.mom_dock = QDockWidget("Moments", self)
         self.mom_dock.setObjectName("moment_dock")
         self.mom_dock.setWidget(self.moments_panel)
-        for d in (self.sug_dock, self.mom_dock):
+        self.layer_panel = LayerPanel()
+        self.layer_dock = QDockWidget("Layers", self)
+        self.layer_dock.setObjectName("layer_dock")
+        self.layer_dock.setWidget(self.layer_panel)
+        for d in (self.sug_dock, self.mom_dock, self.layer_dock):
             d.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
             self.addDockWidget(Qt.LeftDockWidgetArea, d)
         self.tabifyDockWidget(self.sug_dock, self.mom_dock)
+        self.tabifyDockWidget(self.mom_dock, self.layer_dock)
         self.sug_dock.raise_()
         self.resizeDocks([self.sug_dock, ref_dock], [430, 320], Qt.Horizontal)
         self._wire_moment_panel()
+        self._wire_layer_panel()
 
         self.selection_label = QLabel("")
         self.statusBar().addPermanentWidget(self.selection_label)
@@ -231,6 +254,11 @@ class MainWindow(QMainWindow):
                                        triggered=lambda on: self.set_mode(ia.Mode.MOMENT if on else ia.Mode.VIEW))
         self.moment_mode_act.setToolTip("Moment-edit mode: drag from an atom to set its moment")
         tb.addAction(self.moment_mode_act)
+        self.layer_mode_act = QAction("Layers (L)", self, checkable=True,
+                                      triggered=lambda on: self.set_mode(ia.Mode.LAYER if on else ia.Mode.VIEW))
+        self.layer_mode_act.setToolTip("Layer editor: click spins up/down layer by layer, with "
+                                       "rule-based pattern completion")
+        tb.addAction(self.layer_mode_act)
         tb.addSeparator()
         for view in VIEWS:
             label = "3D" if view == "oblique" else view
@@ -291,6 +319,10 @@ class MainWindow(QMainWindow):
         self.set_document(MagDocument.new(crystal))
 
     def set_document(self, doc: MagDocument, session_path: Path | None = None) -> None:
+        if self.editor.machine.mode != ia.Mode.VIEW:
+            self.editor.set_mode(ia.Mode.VIEW)
+        self.layers = None
+        self.current_layer = 0
         self.doc = doc
         self.session_path = session_path
         doc.history.subscribe(self._on_history)
@@ -342,7 +374,12 @@ class MainWindow(QMainWindow):
         return canvas_moments[self.scene.model.atoms.parent]
 
     # -- selection ----------------------------------------------------------------
-    def _on_select(self, sites: list[int], op: ia.SelectOp) -> None:
+    def _on_select(self, sites: list[int], op: ia.SelectOp, click: bool = False) -> None:
+        if self.in_layer_mode and click and len(sites) == 1 and self.layer is not None \
+                and sites[0] in set(self.layer.sites.tolist()) and op == ia.SelectOp.REPLACE:
+            sign = self.doc.layer_click(sites[0])
+            self.statusBar().showMessage(f"{self.doc.site_label(sites[0])}: {'up' if sign > 0 else 'down'}")
+            return
         self.set_selection(apply_selection(self.selection, sites, op))
 
     def _on_clear(self) -> None:
@@ -357,6 +394,11 @@ class MainWindow(QMainWindow):
 
     def _refresh_selection(self) -> None:
         if self.doc is None or self.scene.model is None:
+            return
+        if self.in_layer_mode:
+            self._refresh_layer()
+            n = len(self.selection)
+            self.selection_label.setText(f"{n} site{'s' if n != 1 else ''} selected" if n else "")
             return
         sel = np.array(sorted(self.selection), dtype=int)
         main_parent = self.scene.model.atoms.parent
@@ -409,6 +451,15 @@ class MainWindow(QMainWindow):
 
     def _on_mode_changed(self, mode: ia.Mode) -> None:
         self.moment_mode_act.setChecked(mode == ia.Mode.MOMENT)
+        self.layer_mode_act.setChecked(mode == ia.Mode.LAYER)
+        if mode == ia.Mode.LAYER:
+            if not self._enter_layer_mode():
+                self.editor.set_mode(ia.Mode.VIEW)
+                return
+            self.statusBar().showMessage("Mode: layer")
+            return
+        if self.editor.scene is self.layer_scene:
+            self._leave_layer_mode()
         if mode == ia.Mode.MOMENT:
             self._moment_view_before_mode = self.moment_view
             self.moment_view_act.setChecked(True)
@@ -416,6 +467,126 @@ class MainWindow(QMainWindow):
         else:
             self.moment_view_act.setChecked(self._moment_view_before_mode)
         self.statusBar().showMessage(f"Mode: {mode.value}")
+
+    # -- layer editor -----------------------------------------------------------------
+    def _wire_layer_panel(self) -> None:
+        p = self.layer_panel
+        p.axis_changed.connect(self._set_layer_axis)
+        p.layer_selected.connect(self.select_layer)
+        p.apply_candidate.connect(self.apply_layer_candidate)
+        p.preview_candidate.connect(self._preview_layer_candidate)
+        p.clear_layer.connect(lambda: self.doc and self.layers and
+                              self.doc.clear_layer(self.layer.sites))
+        p.set_selected.connect(self._layer_set_selected)
+
+    @property
+    def in_layer_mode(self) -> bool:
+        return self.editor.machine.mode == ia.Mode.LAYER
+
+    @property
+    def layer(self):
+        return self.layers.layers[self.current_layer] if self.layers and self.layers.layers else None
+
+    def toggle_layer_mode(self) -> None:
+        self.set_mode(ia.Mode.VIEW if self.in_layer_mode else ia.Mode.LAYER)
+
+    def _compute_layers(self) -> None:
+        sites = np.nonzero(self.doc.canvas_magnetic)[0]
+        self.layers = decompose(self.doc.canvas.structure, sites, self.doc.crystal.lattice_matrix,
+                                self.layer_axis)
+        self.current_layer = min(self.current_layer, max(0, len(self.layers.layers) - 1))
+        self.layer_panel.set_layers([L.label for L in self.layers.layers], self.current_layer)
+
+    def _enter_layer_mode(self) -> bool:
+        if self.doc is None or not self.doc.canvas_magnetic.any():
+            self.statusBar().showMessage("No magnetic sites yet: accept suggestions or set moments first")
+            return False
+        self._compute_layers()
+        self.scene.set_visible(False)
+        self.editor.scene = self.layer_scene
+        self.layer_dock.raise_()
+        self._refresh_layer(reset_camera=True)
+        return True
+
+    def _leave_layer_mode(self) -> None:
+        self.layer_scene.clear()
+        self.editor.scene = self.scene
+        if self._main_dirty:
+            self._rebuild_main(reset_camera=False)
+            self._main_dirty = False
+        self.scene.set_visible(True)
+        self.scene.set_view(self.scene._view)
+        self._refresh_selection()
+        self.viewport.render()
+
+    def _layer_state(self):
+        L = self.layer
+        signs = self.doc.spin_sign(L.sites)
+        pinned = self.doc.pinned[L.sites]
+        return L, signs, pinned
+
+    def _refresh_layer(self, reset_camera: bool = False, preview=None) -> None:
+        if self.layers is None or self.layer is None:
+            return
+        L, signs, pinned = self._layer_state()
+        pins = {int(i): int(signs[i]) for i in np.nonzero(pinned)[0] if signs[i] != 0}
+        labels = [self.doc.site_label(s) for s in L.sites]
+        self.layer_match = match_layer(L, pins, labels)
+        if preview is None:
+            self.layer_panel.set_match(L.lattice.reason, self.layer_match)
+        selected = np.isin(L.sites, list(self.selection))
+        self.layer_scene.show(self.doc.canvas.structure, L, self.layer_axis, signs, pinned,
+                              preview=preview, reset_camera=reset_camera, selected=selected)
+        inputs = np.unique(self.doc.canvas.parent[L.sites])
+        if self.ref_scene.model is not None:
+            self.ref_scene.set_selection(np.nonzero(np.isin(self.ref_scene.model.atoms.parent, inputs))[0])
+            self.reference.render()
+        self.viewport.render()
+
+    def select_layer(self, index: int) -> None:
+        if self.layers is None or not (0 <= index < len(self.layers.layers)):
+            return
+        self.current_layer = index
+        self.layer_panel.set_current(index)
+        self._refresh_layer(reset_camera=True)
+        self.statusBar().showMessage(self.layer.label)
+
+    def step_layer(self, delta: int) -> None:
+        if self.in_layer_mode and self.layers:
+            self.select_layer((self.current_layer + delta) % len(self.layers.layers))
+
+    def _set_layer_axis(self, axis: str) -> None:
+        self.layer_axis = axis
+        if self.in_layer_mode:
+            self.current_layer = 0
+            self._compute_layers()
+            self._refresh_layer(reset_camera=True)
+
+    def apply_layer_candidate(self, k: int) -> bool:
+        if self.layer_match is None or not (0 <= k < len(self.layer_match.candidates)):
+            return False
+        cand = self.layer_match.candidates[k]
+        L = self.layer
+        self.doc.apply_completion(L.sites, cand.signs,
+                                  f"Complete {L.element} layer {L.index}: {cand.pattern.label}")
+        return True
+
+    def _preview_layer_candidate(self, k: int) -> None:
+        if self.layer_match is None:
+            return
+        if 0 <= k < len(self.layer_match.candidates):
+            self._refresh_layer(preview=self.layer_match.candidates[k].signs)
+        else:
+            self._refresh_layer()
+
+    def _layer_set_selected(self, sign: int) -> None:
+        if self.layer is None:
+            return
+        sites = sorted(set(self.layer.sites.tolist()) & set(self.selection))
+        if not sites:
+            self.statusBar().showMessage("Box-select sites of this layer first (long-press + drag)")
+            return
+        self.doc.layer_set(sites, sign)
 
     # -- moment drag ------------------------------------------------------------------
     def _on_drag(self, action) -> None:
@@ -562,6 +733,10 @@ class MainWindow(QMainWindow):
 
     def _context_menu(self, site: int | None) -> None:
         if self.doc is None:
+            return
+        if self.in_layer_mode:
+            if site is not None and self.layer is not None and site in set(self.layer.sites.tolist()):
+                self.doc.layer_unset(site)
             return
         if site is not None and site not in self.selection:
             self.set_selection({site})
@@ -712,7 +887,12 @@ class MainWindow(QMainWindow):
         n = len(self.doc.canvas)
         self.selection = frozenset(s for s in self.selection if s < n)
         self._sync_model_ui()
-        self._rebuild_main(reset_camera=False)
+        if self.in_layer_mode:
+            self._main_dirty = True
+            self._compute_layers()
+            self._refresh_layer()
+        else:
+            self._rebuild_main(reset_camera=False)
         self._refresh_moment_panel()
         self._update_actions()
         if self.autosave_enabled:
@@ -730,13 +910,19 @@ class MainWindow(QMainWindow):
 
     # -- view ---------------------------------------------------------------------
     def set_view(self, view: str) -> None:
-        self.scene.set_view(view)
+        if self.in_layer_mode:
+            self.layer_scene.set_view()
+        else:
+            self.scene.set_view(view)
         self.viewport.render()
 
     def _set_moment_view(self, on: bool) -> None:
         self.moment_view = on
         if self.doc is not None:
-            self._rebuild_main(reset_camera=False)
+            if self.in_layer_mode:
+                self._main_dirty = True
+            else:
+                self._rebuild_main(reset_camera=False)
 
     def save_image_dialog(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "Save image", "magview.png", "PNG (*.png)")

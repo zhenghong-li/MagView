@@ -7,7 +7,7 @@ MagView is a real-time crystal-structure editor modeled on VESTA, with an intera
 3. You choose how the layers stack.
 4. It finds the minimal magnetic supercell and writes a JSON handoff for an AgentDFT backend.
 
-MagView is built in phases; see `docs/reports/`. **Status: Phase 2 done**: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, **moment editing** (drag, axis locks, snapping, batch operations, FM/AFM pattern popover) and session files.
+MagView is built in phases; see `docs/reports/`. **Status: Phase 3 done**: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing (drag, locks, batch operations, pattern popover), session files, and the **layer editor** with rule-based pattern completion.
 
 ## Setup (Ubuntu 24.04 container or WSL)
 
@@ -31,6 +31,7 @@ On Windows or macOS hosts no system packages are needed; just create the venv an
 .venv/bin/python scripts/render_gallery.py                         # regenerate artifacts/phase0/
 .venv/bin/python scripts/phase1_artifacts.py                       # regenerate artifacts/phase1/
 .venv/bin/python scripts/phase2_artifacts.py                       # regenerate artifacts/phase2/
+.venv/bin/python scripts/phase3_artifacts.py                       # regenerate artifacts/phase3/
 xvfb-run -a .venv/bin/python -m magview.gui.selftest FILE.cif --out DIR   # scripted GUI test
 ```
 
@@ -42,6 +43,11 @@ Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel
 - `F` flips, `0` zeroes, `P` opens the Patterns menu (FM, Néel, stripe, zigzag, A/C/G-type).
 - A right-click opens the context menu.
 - `Ctrl+S` saves a `.magview.json` session; a recovery autosave runs after every edit.
+
+**Layer mode** (`L`):
+- One magnetic layer at a time, seen along the stacking axis (default c).
+- Click toggles up/down; right-click unsets; `PgUp`/`PgDn` changes layer.
+- After two or more clicks, the panel lists the canonical patterns (FM, Néel, stripe, zigzag) that agree with your clicks. Hover to preview, click to apply. Nothing is applied automatically.
 
 Views: `oblique` (default), `a`, `b`, `c`, `a*`, `b*`, `c*`.
 

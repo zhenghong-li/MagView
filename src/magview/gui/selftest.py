@@ -189,6 +189,7 @@ def main(argv=None) -> int:
 
     if not args.phase1_only:
         phase2_checks(win, widget, check, shot, qpt)
+        phase3_checks(win, widget, check, shot, qpt)
 
     (out / "selftest.json").write_text(json.dumps(results, indent=2))
     win.close()
@@ -366,6 +367,94 @@ def phase2_checks(win, widget, check, shot, qpt) -> None:
     QTest.qWait(50)
     check("Esc exits moment mode", win.editor.machine.mode == ia.Mode.VIEW
           and not win.moment_mode_act.isChecked())
+
+
+def phase3_checks(win, widget, check, shot, qpt) -> None:
+    """Layer editor: L mode, click-to-toggle, matcher suggestions, apply, undo, unset, PgDn."""
+    import numpy as np
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from magview.core import interaction as ia
+    from magview.render.picking import pick_atom, project_to_display
+
+    doc = win.doc
+    ren = win.viewport.renderer
+    win.set_selection(set())
+    widget.setFocus()
+    QTest.keyClick(widget, Qt.Key_L)
+    QTest.qWait(100)
+    check("L enters layer mode", win.in_layer_mode and win.layer_mode_act.isChecked()
+          and win.layer_scene.model is not None, win.layer.label if win.layer else "")
+    win.layer_panel.clear_btn.click()
+    QTest.qWait(50)
+    L = win.layer
+    check("clear layer: nothing pinned", not doc.pinned[L.sites].any()
+          and not doc.spin_sign(L.sites).any())
+
+    def click_local(i, button=Qt.LeftButton):
+        model = win.layer_scene.model
+        xy = project_to_display(ren, model.atoms.cart)
+        for d in np.nonzero(model.local == i)[0]:
+            x, y = xy[d]
+            if pick_atom(ren, model, round(x), round(y)) == d:
+                QTest.mouseClick(widget, button, Qt.NoModifier, qpt(x, y))
+                QTest.qWait(60)
+                return True
+        return False
+
+    g = L.graph
+    if L.lattice.supported:
+        k = int(np.nonzero(L.lattice.bond_class == 0)[0][0])
+        i, j = int(g.i[k]), int(g.j[k])
+        cls0, cls1 = L.lattice.classes[0].label, L.lattice.classes[1].label
+        ok = click_local(i) and click_local(j)
+        keys = {c.pattern.key for c in win.layer_match.candidates}
+        expect = {"fm", f"stripe:{cls0}"} if L.lattice.kind in ("square", "rectangular") else None
+        check("two parallel neighbours -> FM + stripe candidates",
+              ok and doc.pinned[L.sites].sum() == 2 and win.layer_match.status == "matches"
+              and (expect is None or keys == expect), f"{sorted(keys)}")
+        shot("09_layer_two_pins")
+        click_local(j)  # up -> down
+        keys = {c.pattern.key for c in win.layer_match.candidates}
+        expect = {"neel", f"stripe:{cls1}"} if L.lattice.kind in ("square", "rectangular") else None
+        check("antiparallel neighbours -> Neel + other stripe",
+              win.layer_match.status == "matches" and (expect is None or keys == expect), f"{sorted(keys)}")
+        neel = [n for n, c in enumerate(win.layer_match.candidates) if c.pattern.key == "neel"]
+        # hover preview leaves the document untouched
+        before = doc.moments.copy()
+        win._preview_layer_candidate(neel[0])
+        QTest.qWait(30)
+        shot("10_layer_preview_neel")
+        win._preview_layer_candidate(-1)
+        check("hover preview does not edit", np.allclose(doc.moments, before))
+        win.layer_panel.candidate_buttons[neel[0]].click()
+        QTest.qWait(80)
+        s = doc.spin_sign(L.sites)
+        check("apply Neel completes the layer (all NN bonds antiparallel)",
+              np.all(s != 0) and np.all(s[g.i] == -s[g.j]))
+        shot("11_layer_neel_applied")
+        QTest.keyClick(win, Qt.Key_Z, Qt.ControlModifier)
+        QTest.qWait(60)
+        check("undo completion", (doc.spin_sign(L.sites) != 0).sum() == 2)
+        click_local(i, Qt.RightButton)
+        check("right-click unsets a pin", doc.pinned[L.sites].sum() == 1
+              and win.layer_match.status == "idle")
+    else:
+        ok = click_local(0) and click_local(1)
+        check("negative control: manual clicks still pin spins", ok and doc.pinned[L.sites].sum() == 2)
+        check("negative control: matcher stays silent",
+              win.layer_match.status == "idle" and not win.layer_match.candidates
+              and "no canonical patterns" in win.layer_match.reason, win.layer_match.reason)
+        shot("09_layer_negative_control")
+    n_layers = len(win.layers.layers)
+    QTest.keyClick(widget, Qt.Key_PageDown)
+    QTest.qWait(80)
+    check("PgDn steps to the next layer", win.current_layer == (1 % n_layers), f"{n_layers} layers")
+    QTest.keyClick(win, Qt.Key_Escape)
+    QTest.qWait(80)
+    check("Esc leaves layer mode, 3D scene back", win.editor.machine.mode == ia.Mode.VIEW
+          and win.editor.scene is win.scene and win.scene.actors["atoms"].GetVisibility())
 
 
 import os  # noqa: E402  (used by phase2_checks)

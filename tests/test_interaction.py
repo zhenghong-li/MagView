@@ -59,7 +59,7 @@ def click(machine, hit, mods=Mods(), x=100, y=100, t=0.0):
                                       (CTRL, SelectOp.TOGGLE)])
 def test_click_atom_selects(m, mods, op):
     out = click(m, 7, mods)
-    assert Select((7,), op) in out and ShowInfo(7) in out
+    assert Select((7,), op, click=True) in out and ShowInfo(7) in out
     assert out[0] == CameraPress(100, 100) and out[-3] == CameraRelease()  # View: camera got press
     assert not m.busy
 

@@ -87,6 +87,7 @@ class Key:
 class Select:
     sites: tuple[int, ...]
     op: SelectOp
+    click: bool = False  # True when it comes from a single click (not a rubber band)
 
 
 @dataclass(frozen=True)
@@ -284,7 +285,7 @@ class InteractionMachine:
                 out.append(ShowInfo(None))
             else:
                 op = SelectOp.TOGGLE if e.mods.ctrl else SelectOp.ADD if e.mods.shift else SelectOp.REPLACE
-                out += [Select((p.hit,), op), ShowInfo(p.hit)]
+                out += [Select((p.hit,), op, click=True), ShowInfo(p.hit)]
         elif state == GestureState.CAMERA:
             self._camera_forwarded = False
             out.append(CameraRelease())

@@ -49,6 +49,7 @@ def to_dict(doc: MagDocument) -> dict:
         "magnetic_input_sites": [int(i) for i in np.nonzero(doc.magnetic)[0]],
         "site_magnitude": doc.site_magnitude.tolist(),
         "spin_axis": doc.spin_axis.tolist(),
+        "pinned_canvas_sites": [int(i) for i in np.nonzero(doc.pinned)[0]],
         "collinear": bool(doc.collinear),
     }
 
@@ -72,6 +73,7 @@ def from_dict(data: dict) -> MagDocument:
                       spin_axis=np.array(data.get("spin_axis", [0, 0, 1]), dtype=float),
                       collinear=bool(data.get("collinear", True)),
                       site_magnitude=np.array(data.get("site_magnitude", np.zeros(len(crystal)))))
+    doc.pinned[data.get("pinned_canvas_sites", [])] = True
     return doc
 
 

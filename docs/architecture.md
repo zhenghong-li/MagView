@@ -48,15 +48,16 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `core/interaction.py` ✓, `core/history.py` ✓, `core/document.py` ✓, `core/selection.py` ✓ | 1 | gesture state machine; undo/redo |
 | `core/suggest.py` ✓ | 1 | magnetic-site suggestion (rule-based) |
 | `core/magnetic.py` ✓, `core/batch.py` ✓, `core/project.py` ✓, `core/graph.py` ✓ | 2 | drag math, batch patterns, save/load, neighbour graphs + sign propagation |
-| `core/lattice2d.py` ✓ (Phase 2), `core/layers.py`, `core/patterns.py` | 3 | 2D lattice classification + pattern library; layers; matcher |
+| `core/lattice2d.py` ✓, `core/layers.py` ✓, `core/patterns.py` ✓ | 2–3 | 2D lattice classification + pattern library; layer decomposition; rule-based matcher |
 | `core/stacking.py` | 4 | inter-layer stacking and its matcher |
 | `core/magcell.py` | 5 | minimal magnetic supercell + explanation |
 | `style/vesta_ini.py` ✓, `style/elements.py` ✓, `style/theme.py` ✓, `style/appearance.py` ✓ | 0 | appearance |
 | `render/model.py` ✓, `render/scene.py` ✓, `render/arrows.py` ✓, `render/camera.py` ✓, `render/offscreen.py` ✓ | 0 | drawing |
 | `render/picking.py` ✓, `render/overlay.py` ✓ | 1 | pick → site, rubber-band projection |
+| `render/layer_view.py` ✓ | 3 | top view of one layer: up/down discs, pinned rings, NN bonds, preview |
 | `io/handoff.py`, `bridge/agentdft.py` | 5 | handoff JSON + schema; mock AgentDFT bridge |
 | `gui/main_window.py` ✓, `gui/app.py` ✓ | 0 | shell: main view, reference view, open, view buttons |
-| `gui/viewport.py` ✓, `gui/panels/suggestion_panel.py` ✓, `gui/panels/moment_panel.py` ✓, `gui/selftest.py` ✓, other panels | 1–5 | interaction wiring, side panels |
+| `gui/viewport.py` ✓, `gui/panels/{suggestion,moment,layer}_panel.py` ✓, `gui/selftest.py` ✓, stacking/export panels | 1–5 | interaction wiring, side panels |
 
 ## Interaction path (Phase 1)
 
@@ -71,6 +72,18 @@ The long-press timer is a Qt single-shot timer that injects `Tick` events. Tests
 ## Pattern engine (Phase 2, reused by Phases 3–4)
 
 A collinear pattern is a sign (+1 FM / −1 AFM) per nearest-neighbour bond. `core.graph.neighbor_graph` builds the periodic nearest-neighbour graph of any set of canvas sites; bonds to images, including a site's own image, are kept. `propagate` turns bond signs into site signs by BFS and lists every contradicting bond, so frustration and "canvas too small" are detected exactly. `core.lattice2d` classifies planar nets (square/rectangular, honeycomb, triangular) by coordination and bond-direction classes, and defines the canonical library as per-class signs.
+
+## Layer editor and matcher (Phase 3)
+
+```
+magnetic canvas sites --decompose(axis)--> layers (per element, clustered along a/b/c)
+   each layer: periodic in-plane NN graph -> lattice2d.classify -> library
+clicks --doc.layer_click--> pinned spins (doc.pinned, undoable, saved)
+pinned spins --patterns.match_layer--> idle | no_match | matches(candidates)  (never auto-applied)
+candidate --doc.apply_completion--> whole layer set (one undo step)
+```
+
+**Gotcha:** pyvista remembers its own interactor style and re-applies it on some calls (`iren.update_style()`). The editor style must be registered with `plotter.iren.style = ...`; setting it directly on the VTK interactor got silently reverted after the first layer redraw.
 
 ## Rendering notes
 - **Atoms:** one glyph actor per opacity level, with sphere radius = VESTA atomic radius × `ball_scale`.

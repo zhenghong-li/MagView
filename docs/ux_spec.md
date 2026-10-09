@@ -84,9 +84,24 @@ These apply to the current selection. Each one is a single undo step.
 - Resizing the canvas: growing it extends moments periodically. Shrinking it is refused, with an explanation, when the moments are not periodic in the smaller canvas.
 - The session saves to `.magview.json`, which holds the structure, canvas, moments and settings. A recovery autosave happens after each committed edit.
 
+## 6b. Layer mode (Phase 3)
+
+- **Enter / exit:** `L` or the toolbar enters it; `Esc` or `L` leaves. You get a teal border and banner, and the Layers tab is raised. Without magnetic sites the mode refuses, with a status message.
+- **Main view:** shows only the current layer, seen along the stacking axis.
+  - Spins are drawn as discs: red "+" up, blue "−" down, gray unset. A dark ring marks a pinned site, i.e. one set by a click.
+  - Nearest-neighbour bonds are drawn as gray lines.
+- **Reference view:** highlights the current layer's sites in the full unit cell.
+- **Click:** unpinned → up → down → up (pinned). Right-click: unset (unpin, zero). Box select + "Selected: up/down" pins many sites at once. PgUp/PgDn step through layers.
+- **Suggestions** (rule-based, `core/patterns.py`):
+  - With at least 2 pinned sites on a supported net, the panel lists every canonical pattern that agrees with all pins, plus the excluded patterns with the reason.
+  - Hovering a candidate previews it in lighter colors on the unpinned sites.
+  - Clicking applies it to the whole layer as one undo step.
+  - On an unsupported net (e.g. the Cs3V9Te13 V trimer net) the panel says why and stays silent. **Nothing is applied automatically.**
+- **Stacking axis:** a, b or c (default c). Changing it recomputes the layers.
+
 ## 7. Keyboard summary
 
-`M` moment mode · `L` layer mode · `Esc` cancel/exit · `B` arm box select · `P` patterns · `F` flip selection · `0` zero selection · `Ctrl+A` select all magnetic sites · `Ctrl+Z`/`Ctrl+Y` undo/redo · hold `X Y Z A B C` axis lock · hold `Shift` snap.
+`M` moment mode · `L` layer mode · `PgUp`/`PgDn` previous/next layer · `Esc` cancel/exit · `B` arm box select · `P` patterns · `F` flip selection · `0` zero selection · `Ctrl+A` select all magnetic sites · `Ctrl+Z`/`Ctrl+Y` undo/redo · hold `X Y Z A B C` axis lock · hold `Shift` snap.
 
 ## 8. Changes made during implementation (Phase 2)
 
@@ -99,3 +114,4 @@ These apply to the current selection. Each one is a single undo step.
 | Right-click without movement opens the context menu; right-drag keeps VTK's zoom | Both behaviors are kept without a mode switch. |
 | Overlay text avoids the `\|` character | VTK's text renderer treats `\|` specially, so "\|m\| = ..." rendered garbled. |
 | Patterns popover: entries that don't apply stay visible but disabled, with the reason as a tooltip | Required by §4 ("grayed out with the reason"). |
+| Interactor style registered through pyvista (`plotter.iren.style`) | pyvista re-applied its own trackball style after a layer redraw, which silently disabled clicks (found by the Phase 3 GUI self-test). |

@@ -56,12 +56,15 @@ class MagDocument:
     spin_axis: np.ndarray = field(default_factory=lambda: np.array(DEFAULT_SPIN_AXIS))
     collinear: bool = True
     site_magnitude: np.ndarray | None = None  # (len(crystal),) preferred |m| per input site
+    pinned: np.ndarray | None = None  # (len(canvas),) bool: spins set by clicks in the layer editor
     history: History = field(init=False)
 
     def __post_init__(self) -> None:
         self.history = History(self)
         if self.site_magnitude is None:
             self.site_magnitude = np.zeros(len(self.crystal))
+        if self.pinned is None:
+            self.pinned = np.zeros(len(self.canvas), bool)
 
     @classmethod
     def new(cls, crystal: CrystalStructure, canvas_matrix=DEFAULT_MATRIX) -> "MagDocument":
@@ -115,8 +118,9 @@ class MagDocument:
         current moments are not periodic in the new canvas."""
         new = Canvas.build(self.crystal, matrix)
         moments = self.canvas.resize_moments(new, self.moments)
+        pinned = self.canvas.transfer(new, self.pinned).astype(bool)
         self._commit(f"Canvas {self.canvas.describe()} -> {new.describe()}", canvas=new,
-                     moments=moments)
+                     moments=moments, pinned=pinned)
 
     # -- moment edits ---------------------------------------------------------------
     def magnitude_for(self, sites) -> np.ndarray:
@@ -197,3 +201,47 @@ class MagDocument:
                          moments=mg.project_collinear(self.moments, self.spin_axis))
             return
         self._commit("Collinear model", collinear=True)
+
+    # -- layer editor (collinear up/down) -----------------------------------------------
+    def spin_sign(self, sites) -> np.ndarray:
+        """+1 / -1 / 0 per site: sign of the moment along the spin axis."""
+        proj = self.moments[np.asarray(sites, dtype=int)] @ mg.unit(self.spin_axis)
+        return np.where(proj > 1e-9, 1, np.where(proj < -1e-9, -1, 0))
+
+    def _spin_commit(self, label: str, sites, signs, pin) -> None:
+        sites = np.asarray(sites, dtype=int)
+        moments = self.moments.copy()
+        mags = self.magnitude_for(sites)
+        moments[sites] = np.outer(mags * np.asarray(signs, float), mg.unit(self.spin_axis))
+        pinned = self.pinned.copy()
+        if pin is not None:
+            pinned[sites] = pin
+        flags = self.magnetic.copy()
+        flags[self.canvas.parent[sites[np.asarray(signs) != 0]]] = True
+        self._commit(label, moments=moments, pinned=pinned, magnetic=flags)
+
+    def layer_click(self, site: int) -> int:
+        """Toggle a site in the layer editor: unpinned -> up, up -> down, down -> up.
+        The site becomes pinned. Returns the new sign."""
+        cur = int(self.spin_sign([site])[0])
+        new = -1 if (self.pinned[site] and cur > 0) else 1
+        self._spin_commit(f"Layer: site {site} {'up' if new > 0 else 'down'}", [site], [new], True)
+        return new
+
+    def layer_set(self, sites, sign: int) -> None:
+        """Pin ``sites`` with spin ``sign`` (+1 up / -1 down)."""
+        sites = np.asarray(sorted(set(int(x) for x in sites)), dtype=int)
+        if len(sites):
+            self._spin_commit(f"Layer: {len(sites)} sites {'up' if sign > 0 else 'down'}", sites,
+                              np.full(len(sites), int(np.sign(sign))), True)
+
+    def layer_unset(self, site: int) -> None:
+        self._spin_commit(f"Layer: unset site {site}", [site], [0], False)
+
+    def clear_layer(self, sites) -> None:
+        sites = np.asarray(sites, dtype=int)
+        self._spin_commit("Clear layer", sites, np.zeros(len(sites), int), False)
+
+    def apply_completion(self, sites, signs, label: str) -> None:
+        """Set the spins of a whole layer (pins are kept as they are)."""
+        self._spin_commit(label, sites, signs, None)

@@ -163,6 +163,11 @@ class StructureScene:
         new = self._arrow_polydata(moments)
         self._arrow_mesh.copy_from(new)
 
+    def set_visible(self, on: bool) -> None:
+        """Show/hide every actor of this scene (the axes triad stays)."""
+        for actor in self.actors.values():
+            actor.SetVisibility(bool(on))
+
     def set_selection(self, display_indices) -> None:
         """Translucent halo around the given displayed atoms."""
         if "selection" in self.actors:

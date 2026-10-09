@@ -28,7 +28,7 @@ MODE_BANNERS = {
 
 @dataclass
 class ViewportCallbacks:
-    select: Callable[[list[int], ia.SelectOp], None]  # canvas sites
+    select: Callable[..., None]  # (canvas sites, op, click=bool)
     clear: Callable[[], None]
     info: Callable[[int | None], None]
     mode_changed: Callable[[ia.Mode], None] = lambda mode: None
@@ -99,7 +99,9 @@ class EditorViewport:
         self.machine = ia.InteractionMachine()
         self.style = EditorInteractorStyle(self)
         plotter.iren.clear_key_event_callbacks()  # pyvista binds q (close), b, v, ...
-        plotter.iren.interactor.SetInteractorStyle(self.style)
+        # Register through pyvista: it re-applies its remembered style on some calls
+        # (update_style); setting it any other way gets silently reverted.
+        plotter.iren.style = self.style
         self.box = BoxOverlay(plotter.renderer)
         self.mode_overlay = ModeOverlay(plotter.renderer)
         self._timer = QTimer()
@@ -172,7 +174,7 @@ class EditorViewport:
                     self.style.OnLeftButtonUp()
                 self._camera_down = False
             elif isinstance(a, ia.Select):
-                self.cb.select(list(a.sites), a.op)
+                self.cb.select(list(a.sites), a.op, click=a.click)
             elif isinstance(a, ia.ClearSelection):
                 self.cb.clear()
             elif isinstance(a, ia.ShowInfo):

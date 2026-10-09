@@ -141,3 +141,8 @@ class Canvas:
                 f"has m = {np.round(moments[i], 3).tolist()} but the new canvas would force "
                 f"m = {np.round(back[i], 3).tolist()} ({len(bad)} sites conflict)")
         return new_m
+
+    def transfer(self, new: "Canvas", values: np.ndarray) -> np.ndarray:
+        """Carry per-site values onto canvas ``new`` by periodic lookup (no consistency check)."""
+        values = np.asarray(values)
+        return np.array([values[self.index_of(p, r)] for p, r in zip(new.parent, new.translation)])
