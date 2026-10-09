@@ -36,7 +36,7 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 - **Minimal-cell analysis** (Phase 5) works on the spglib primitive lattice, so centering translations count.
 - **VESTA data** is read at runtime and never stored in the repository.
 
-## Modules (✓ = exists after Phase 0)
+## Modules (✓ = exists)
 
 | Module | Phase | Role |
 |---|---|---|
@@ -44,19 +44,29 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `core/images.py` ✓ | 0 | boundary images for any fractional box |
 | `core/bonds.py` ✓ | 0 | VESTA SBOND semantics (boundary modes 0/1), covalent-radius fallback |
 | `core/species.py` ✓ | 0 | element-symbol helper |
-| `core/canvas.py` | 1 | editing canvas W × input cell; site ↔ (parent, R) |
-| `core/interaction.py`, `core/history.py` | 1 | gesture state machine; undo/redo |
-| `core/suggest.py` | 1 | magnetic-site suggestion (rule-based) |
+| `core/canvas.py` ✓ | 1 | editing canvas W × input cell; site ↔ (parent, R) |
+| `core/interaction.py` ✓, `core/history.py` ✓, `core/document.py` ✓, `core/selection.py` ✓ | 1 | gesture state machine; undo/redo |
+| `core/suggest.py` ✓ | 1 | magnetic-site suggestion (rule-based) |
 | `core/magnetic.py`, `core/batch.py`, `core/project.py` | 2 | moment model, batch patterns, save/load |
 | `core/layers.py`, `core/lattice2d.py`, `core/patterns.py` | 3 | layers, 2D lattice classification, matcher |
 | `core/stacking.py` | 4 | inter-layer stacking and its matcher |
 | `core/magcell.py` | 5 | minimal magnetic supercell + explanation |
 | `style/vesta_ini.py` ✓, `style/elements.py` ✓, `style/theme.py` ✓, `style/appearance.py` ✓ | 0 | appearance |
 | `render/model.py` ✓, `render/scene.py` ✓, `render/arrows.py` ✓, `render/camera.py` ✓, `render/offscreen.py` ✓ | 0 | drawing |
-| `render/picking.py` | 1 | pick → site, rubber-band projection |
+| `render/picking.py` ✓, `render/overlay.py` ✓ | 1 | pick → site, rubber-band projection |
 | `io/handoff.py`, `bridge/agentdft.py` | 5 | handoff JSON + schema; mock AgentDFT bridge |
 | `gui/main_window.py` ✓, `gui/app.py` ✓ | 0 | shell: main view, reference view, open, view buttons |
-| `gui/viewport.py`, `gui/panels/*` | 1–5 | interaction wiring, side panels |
+| `gui/viewport.py` ✓, `gui/panels/suggestion_panel.py` ✓, `gui/selftest.py` ✓, other panels | 1–5 | interaction wiring, side panels |
+
+## Interaction path (Phase 1)
+
+```
+Qt mouse event -> QVTKRenderWindowInteractor -> EditorInteractorStyle (VTK observers)
+   -> pick (analytic ray-sphere) -> core.interaction.InteractionMachine.handle(event)
+   -> actions: CameraPress/Release (forwarded to the trackball style), Select/Clear,
+      BoxArmed/Update/Finish (render.overlay + render.picking), Drag* (Phase 2)
+```
+The long-press timer is a Qt single-shot timer that injects `Tick` events. Tests inject the same events directly. `magview.gui.selftest` drives the whole path with QtTest under Xvfb.
 
 ## Rendering notes
 - **Atoms:** one glyph actor per opacity level, with sphere radius = VESTA atomic radius × `ball_scale`.

@@ -35,6 +35,7 @@ class SceneModel:
     cell_edges: np.ndarray  # (12, 2, 3)
     moments: np.ndarray | None = None  # (n, 3) Cartesian mu_B per displayed atom
     atom_opacity: np.ndarray | None = None  # (n,) in [0, 1]; None means fully opaque
+    grid_edges: np.ndarray | None = None  # (k, 2, 3) light sub-cell grid (canvas view)
 
     @property
     def center(self) -> np.ndarray:
@@ -54,9 +55,31 @@ def cell_edges(lattice: np.ndarray, origin=(0.0, 0.0, 0.0)) -> np.ndarray:
     return np.array([[corners[a], corners[b]] for a, b in _EDGES])
 
 
+def subcell_edges(input_lattice: np.ndarray, matrix: np.ndarray) -> np.ndarray | None:
+    """Grid lines of the input cells inside a diagonal canvas (outer edges excluded)."""
+    m = np.asarray(matrix)
+    if not np.all(m == np.diag(np.diag(m))):
+        return None
+    n = np.diag(m).astype(int)
+    segs = []
+    for axis in range(3):
+        u, v = [k for k in range(3) if k != axis]
+        for i in range(n[u] + 1):
+            for j in range(n[v] + 1):
+                if i in (0, n[u]) and j in (0, n[v]):
+                    continue  # canvas edge, drawn by the cell outline
+                a = np.zeros(3)
+                a[u], a[v] = i, j
+                b = a.copy()
+                b[axis] = n[axis]
+                segs.append([a @ input_lattice, b @ input_lattice])
+    return np.array(segs).reshape(-1, 2, 3) if segs else None
+
+
 def build_scene_model(crystal: CrystalStructure, appearance: Appearance,
                       bounds=DEFAULT_BOUNDS, site_moments: np.ndarray | None = None,
-                      show_bonds: bool = True, moment_view: bool = False) -> SceneModel:
+                      show_bonds: bool = True, moment_view: bool = False,
+                      grid_edges: np.ndarray | None = None) -> SceneModel:
     """Assemble atoms (with boundary images), bonds, cell edges and optional moments.
 
     ``site_moments`` is (n_sites, 3) Cartesian mu_B for the sites of ``crystal``;
@@ -98,7 +121,7 @@ def build_scene_model(crystal: CrystalStructure, appearance: Appearance,
         opacity = np.where(has_moment, 1.0, theme.moment_view_nonmagnetic_opacity)
 
     return SceneModel(lattice, atoms, atom_symbols, radius, rgb, bonds, segs, seg_rgb,
-                      cell_edges(lattice), moments, opacity)
+                      cell_edges(lattice), moments, opacity, grid_edges)
 
 
 def _bond_geometry(bonds: BondSet, atoms: DisplayAtoms, atom_rgb: np.ndarray, theme):

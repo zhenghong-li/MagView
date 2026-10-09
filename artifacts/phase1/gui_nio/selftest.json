@@ -1,0 +1,62 @@
+[
+  {
+    "step": "click selects one site",
+    "ok": true,
+    "detail": "site 56"
+  },
+  {
+    "step": "shift-click adds",
+    "ok": true,
+    "detail": "[39, 56]"
+  },
+  {
+    "step": "drag rotates camera",
+    "ok": true,
+    "detail": "camera moved 51.913"
+  },
+  {
+    "step": "long-press arms box",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "box selects sites inside",
+    "ok": true,
+    "detail": "48 selected, 48 expected"
+  },
+  {
+    "step": "Esc clears selection",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "accept sets edited moments",
+    "ok": true,
+    "detail": "Ni0 (4a): |m| = [np.float64(1.7)]"
+  },
+  {
+    "step": "Ctrl+Z undoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+Y redoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "canvas 2x2x2 -> 1x1x1",
+    "ok": true,
+    "detail": "8 sites"
+  },
+  {
+    "step": "undo canvas resize",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+A selects magnetic sites",
+    "ok": true,
+    "detail": "32 sites"
+  }
+]

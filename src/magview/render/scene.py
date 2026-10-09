@@ -35,6 +35,7 @@ class StructureScene:
         self.actors: dict[str, object] = {}
         self._triad: AxesTriad | None = None
         self._view = "oblique"
+        self._selection = np.zeros(0, int)
         plotter.set_background(theme.background)
         self._setup_lighting()
 
@@ -94,8 +95,16 @@ class StructureScene:
             self.actors["cell"] = self.plotter.add_mesh(
                 edges, color=t.cell_line_color, line_width=t.cell_line_width, lighting=False,
                 name="cell")
+        if model.grid_edges is not None and len(model.grid_edges):
+            k = len(model.grid_edges)
+            grid = pv.PolyData()
+            grid.points = model.grid_edges.reshape(-1, 3)
+            grid.lines = np.column_stack([np.full(k, 2), 2 * np.arange(k), 2 * np.arange(k) + 1]).ravel()
+            self.actors["grid"] = self.plotter.add_mesh(
+                grid, color=(0.72, 0.72, 0.72), line_width=1.0, lighting=False, name="grid")
 
         self.set_moments(model.moments)
+        self._selection: np.ndarray = np.zeros(0, int)
 
         if self.show_axes:
             if self._triad is None:
@@ -124,6 +133,26 @@ class StructureScene:
         mesh = mesh.compute_normals(split_vertices=True, feature_angle=50.0, auto_orient_normals=False)
         self.actors["arrows"] = self.plotter.add_mesh(
             mesh, scalars="rgb", rgb=True, name="arrows", **self._material())
+
+    def set_selection(self, display_indices) -> None:
+        """Translucent halo around the given displayed atoms."""
+        if "selection" in self.actors:
+            self.plotter.remove_actor(self.actors.pop("selection"), render=False)
+        idx = np.asarray(sorted(set(int(i) for i in display_indices)), dtype=int)
+        self._selection = idx
+        if self.model is None or len(idx) == 0:
+            return
+        cloud = pv.PolyData(self.model.atoms.cart[idx])
+        cloud["radius"] = self.model.atom_radius[idx] * 1.35 + 0.08
+        sphere = pv.Sphere(radius=1.0, theta_resolution=24, phi_resolution=12)
+        halo = cloud.glyph(geom=sphere, scale="radius", orient=False, factor=1.0)
+        self.actors["selection"] = self.plotter.add_mesh(
+            halo, color=self.theme.selection_color, opacity=0.45, name="selection",
+            ambient=0.5, diffuse=0.5, specular=0.0, smooth_shading=True)
+
+    @property
+    def selection(self) -> np.ndarray:
+        return self._selection
 
     # -- camera -----------------------------------------------------------------
     def set_view(self, view: str = "oblique") -> None:
