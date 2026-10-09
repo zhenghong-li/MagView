@@ -1,0 +1,370 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/NiO.cif",
+  "sha256": "be9ceed82fe2180925cf22c3c284de6dea548247456251ac4c59678bfd847114",
+  "formula": "NiO",
+  "space_group": {
+   "number": 225,
+   "symbol": "Fm-3m"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    4.1771,
+    0.0,
+    2.557736072359205e-16
+   ],
+   [
+    6.7172891199642785e-16,
+    4.1771,
+    2.557736072359205e-16
+   ],
+   [
+    0.0,
+    0.0,
+    4.1771
+   ]
+  ],
+  "species": [
+   "Ni",
+   "Ni",
+   "Ni",
+   "Ni",
+   "O",
+   "O",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.5
+   ],
+   [
+    0.0,
+    0.5,
+    0.5
+   ],
+   [
+    0.0,
+    0.0,
+    0.5
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.5
+   ]
+  ],
+  "labels": [
+   "Ni0",
+   "Ni0",
+   "Ni0",
+   "Ni0",
+   "O1",
+   "O1",
+   "O1",
+   "O1"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    4.440892098500626e-16,
+    2.08855,
+    -2.0885499999999997
+   ],
+   [
+    2.08855,
+    0.0,
+    2.08855
+   ],
+   [
+    -4.440892098500626e-16,
+    -2.08855,
+    -2.08855
+   ]
+  ],
+  "species": [
+   "Ni",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.5
+   ]
+  ],
+  "labels": [
+   "Ni0",
+   "O1"
+  ],
+  "description": "chemical primitive cell (spglib, input orientation)",
+  "parent_input_site": [
+   0,
+   4
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    4.440892098500626e-16,
+    2.08855,
+    -2.0885499999999997
+   ],
+   [
+    2.0885499999999997,
+    -2.08855,
+    0.0
+   ],
+   [
+    -2.0885500000000006,
+    -2.08855,
+    -4.1771
+   ]
+  ],
+  "species": [
+   "Ni",
+   "Ni",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.5
+   ],
+   [
+    0.5,
+    0.75,
+    0.75
+   ],
+   [
+    0.5,
+    0.25,
+    0.25
+   ]
+  ],
+  "labels": [
+   "Ni0",
+   "Ni0",
+   "O1",
+   "O1"
+  ],
+  "parent_input_site": [
+   0,
+   1,
+   4,
+   7
+  ]
+ },
+ "supercell_matrix": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   1
+  ],
+  [
+   0,
+   -1,
+   1
+  ]
+ ],
+ "supercell_matrix_input": null,
+ "multiplicity": 2,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   2
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    2.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -2.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   2.0,
+   -2.0,
+   0.0,
+   0.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Ni layers (square): stripe: FM chains along [1-10]",
+   "Ni stacking along c: undefined (frustrated: a site in layer 1 has inter-layer neighbours with both spins)"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Ni",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "square",
+    "pattern": "stripe: FM chains along [1-10]",
+    "relation_to_layer0": null
+   },
+   {
+    "element": "Ni",
+    "index": 1,
+    "height_A": 2.0886,
+    "lattice": "square",
+    "pattern": "stripe: FM chains along [1-10]",
+    "relation_to_layer0": null
+   },
+   {
+    "element": "Ni",
+    "index": 2,
+    "height_A": 4.1771,
+    "lattice": "square",
+    "pattern": "stripe: FM chains along [1-10]",
+    "relation_to_layer0": null
+   },
+   {
+    "element": "Ni",
+    "index": 3,
+    "height_A": 6.2657,
+    "lattice": "square",
+    "pattern": "stripe: FM chains along [1-10]",
+    "relation_to_layer0": null
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 1332,
+  "msg_type": 4,
+  "n_operations": 24,
+  "primitive_volume": 36.4413637785055
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    1,
+    0,
+    0
+   ],
+   [
+    0,
+    1,
+    1
+   ],
+   [
+    0,
+    -1,
+    1
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 2 chemical primitive cells.",
+  "It is not a supercell of the input cell (it fits the primitive lattice only).",
+  "Translation a is not a magnetic translation: it maps Ni0 (up) -> Ni0 (down).",
+  "Translation b is not a magnetic translation: it maps Ni0 (up) -> Ni0 (down).",
+  "Translation c is not a magnetic translation: it maps Ni0 (up) -> Ni0 (down).",
+  "Translation (1/2, 0, 1/2) centring is not a magnetic translation: it maps Ni0 (up) -> Ni0 (down).",
+  "Translation (1/2, 1/2, 0) centring is not a magnetic translation: it maps Ni0 (up) -> Ni0 (down)."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "2 -2 2*0",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "Ni",
+    "O"
+   ],
+   "species_counts": [
+    2,
+    2
+   ]
+  }
+ }
+}

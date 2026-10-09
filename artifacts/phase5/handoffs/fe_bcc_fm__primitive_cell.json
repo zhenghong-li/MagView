@@ -1,0 +1,250 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:40+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/Fe_bcc.cif",
+  "sha256": "0c06651cfc22d416ddb02fdcb01bad6b0859074065e6b6be22fb0bbb730d0db3",
+  "formula": "Fe",
+  "space_group": {
+   "number": 229,
+   "symbol": "Im-3m"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    2.8665,
+    0.0,
+    1.7552250248779438e-16
+   ],
+   [
+    4.609683575298078e-16,
+    2.8665,
+    1.7552250248779438e-16
+   ],
+   [
+    0.0,
+    0.0,
+    2.8665
+   ]
+  ],
+  "species": [
+   "Fe",
+   "Fe"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.5
+   ]
+  ],
+  "labels": [
+   "Fe0",
+   "Fe0"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    1.4332500000000001,
+    1.43325,
+    1.4332500000000001
+   ],
+   [
+    1.4332499999999997,
+    -1.43325,
+    -1.43325
+   ],
+   [
+    -1.4332499999999997,
+    1.4332499999999995,
+    -1.43325
+   ]
+  ],
+  "species": [
+   "Fe"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Fe0"
+  ],
+  "description": "chemical primitive cell (spglib, input orientation)",
+  "parent_input_site": [
+   0
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    1.4332500000000001,
+    1.43325,
+    1.4332500000000001
+   ],
+   [
+    1.4332499999999997,
+    -1.43325,
+    -1.43325
+   ],
+   [
+    -1.4332499999999997,
+    1.4332499999999995,
+    -1.43325
+   ]
+  ],
+  "species": [
+   "Fe"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Fe0"
+  ],
+  "parent_input_site": [
+   0
+  ]
+ },
+ "supercell_matrix": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "supercell_matrix_input": null,
+ "multiplicity": 1,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   2
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    3.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   3.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Fe layers (square): FM",
+   "Fe stacking along c: FM stacking"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Fe",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Fe",
+    "index": 1,
+    "height_A": 1.4332,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Fe",
+    "index": 2,
+    "height_A": 2.8665,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Fe",
+    "index": 3,
+    "height_A": 4.2997,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 1642,
+  "msg_type": 1,
+  "n_operations": 48,
+  "primitive_volume": 11.776760489812496
+ },
+ "requires_unfolding": false,
+ "unfolding": null,
+ "explanation": [
+  "The magnetic cell is the chemical primitive cell (1/2 of the input cell); no supercell is needed."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "3",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "Fe"
+   ],
+   "species_counts": [
+    1
+   ]
+  }
+ }
+}

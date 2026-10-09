@@ -1,0 +1,359 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/toy_square_CuO2.cif",
+  "sha256": "df3e2ef1fee0fdf94634f96680cf5e7f44e92a378de4fef334d28b57d637b0c7",
+  "formula": "CuO2",
+  "space_group": {
+   "number": 123,
+   "symbol": "P4/mmm"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    3.9,
+    0.0,
+    2.3880612583373386e-16
+   ],
+   [
+    6.271678333738882e-16,
+    3.9,
+    2.3880612583373386e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cu",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cu0",
+   "O1",
+   "O1"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    3.9,
+    0.0,
+    2.3880612583373386e-16
+   ],
+   [
+    6.271678333738882e-16,
+    3.9,
+    2.3880612583373386e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cu",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cu0",
+   "O1",
+   "O1"
+  ],
+  "description": "input cell (already primitive)",
+  "parent_input_site": [
+   0,
+   1,
+   2
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    7.8,
+    0.0,
+    4.776122516674677e-16
+   ],
+   [
+    6.271678333738882e-16,
+    3.9,
+    2.3880612583373386e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cu",
+   "Cu",
+   "O",
+   "O",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.25,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.0
+   ],
+   [
+    0.75,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cu0",
+   "Cu0",
+   "O1",
+   "O1",
+   "O1",
+   "O1"
+  ],
+  "parent_input_site": [
+   0,
+   0,
+   1,
+   2,
+   1,
+   2
+  ]
+ },
+ "supercell_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "supercell_matrix_input": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "multiplicity": 2,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    1.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -1.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   1.0,
+   -1.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Cu layers (square): stripe: FM chains along [010]",
+   "Cu stacking along c: FM stacking"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Cu",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "square",
+    "pattern": "stripe: FM chains along [010]",
+    "relation_to_layer0": 1
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 352,
+  "msg_type": 4,
+  "n_operations": 16,
+  "primitive_volume": 243.35999999999993
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    2,
+    0,
+    0
+   ],
+   [
+    0,
+    1,
+    0
+   ],
+   [
+    0,
+    0,
+    1
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 2 chemical primitive cells.",
+  "Relative to the input cell: [[2, 0, 0], [0, 1, 0], [0, 0, 1]].",
+  "Translation a is not a magnetic translation: it maps Cu0 (up) -> Cu0 (down)."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "1 -1 4*0",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "Cu",
+    "O"
+   ],
+   "species_counts": [
+    2,
+    4
+   ]
+  }
+ }
+}

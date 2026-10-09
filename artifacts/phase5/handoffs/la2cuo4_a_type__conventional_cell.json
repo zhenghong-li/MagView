@@ -1,0 +1,606 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/La2CuO4.cif",
+  "sha256": "1303c18e9c04e519a3ffbced41390e5ce25ef7a2376fa7e7e986250d0aa45ffd",
+  "formula": "La2CuO4",
+  "space_group": {
+   "number": 139,
+   "symbol": "I4/mmm"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    3.78,
+    0.0,
+    2.3145824503884976e-16
+   ],
+   [
+    6.078703615777685e-16,
+    3.78,
+    2.3145824503884976e-16
+   ],
+   [
+    0.0,
+    0.0,
+    13.23
+   ]
+  ],
+  "species": [
+   "La",
+   "La",
+   "La",
+   "La",
+   "Cu",
+   "Cu",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.3607
+   ],
+   [
+    0.0,
+    0.0,
+    0.6393
+   ],
+   [
+    0.5,
+    0.5,
+    0.8607
+   ],
+   [
+    0.5,
+    0.5,
+    0.1393
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.5
+   ],
+   [
+    0.0,
+    0.0,
+    0.1824
+   ],
+   [
+    0.0,
+    0.0,
+    0.8176
+   ],
+   [
+    0.5,
+    0.5,
+    0.6824
+   ],
+   [
+    0.5,
+    0.5,
+    0.3176
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.5
+   ],
+   [
+    0.0,
+    0.5,
+    0.5
+   ]
+  ],
+  "labels": [
+   "La0",
+   "La0",
+   "La0",
+   "La0",
+   "Cu1",
+   "Cu1",
+   "O2",
+   "O2",
+   "O2",
+   "O2",
+   "O3",
+   "O3",
+   "O3",
+   "O3"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    -3.78,
+    -0.0,
+    -0.0
+   ],
+   [
+    -6.661338147750939e-16,
+    -3.7800000000000002,
+    -0.0
+   ],
+   [
+    1.8900000000000001,
+    1.89,
+    6.615
+   ]
+  ],
+  "species": [
+   "La",
+   "La",
+   "Cu",
+   "O",
+   "O",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.3607,
+    0.3607,
+    0.7214
+   ],
+   [
+    0.6393,
+    0.6393,
+    0.2786
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.1824,
+    0.1824,
+    0.3648
+   ],
+   [
+    0.8176,
+    0.8176,
+    0.6352
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "La0",
+   "La0",
+   "Cu1",
+   "O2",
+   "O2",
+   "O3",
+   "O3"
+  ],
+  "description": "chemical primitive cell (spglib, input orientation)",
+  "parent_input_site": [
+   0,
+   1,
+   4,
+   6,
+   7,
+   10,
+   11
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    3.78,
+    0.0,
+    2.3145824503884976e-16
+   ],
+   [
+    6.078703615777685e-16,
+    3.78,
+    2.3145824503884976e-16
+   ],
+   [
+    0.0,
+    0.0,
+    13.23
+   ]
+  ],
+  "species": [
+   "La",
+   "La",
+   "La",
+   "La",
+   "Cu",
+   "Cu",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O",
+   "O"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.3607
+   ],
+   [
+    0.0,
+    0.0,
+    0.6393
+   ],
+   [
+    0.5,
+    0.5,
+    0.8607
+   ],
+   [
+    0.5,
+    0.5,
+    0.1393
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.5,
+    0.5
+   ],
+   [
+    0.0,
+    0.0,
+    0.1824
+   ],
+   [
+    0.0,
+    0.0,
+    0.8176
+   ],
+   [
+    0.5,
+    0.5,
+    0.6824
+   ],
+   [
+    0.5,
+    0.5,
+    0.3176
+   ],
+   [
+    0.0,
+    0.5,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.0
+   ],
+   [
+    0.5,
+    0.0,
+    0.5
+   ],
+   [
+    0.0,
+    0.5,
+    0.5
+   ]
+  ],
+  "labels": [
+   "La0",
+   "La0",
+   "La0",
+   "La0",
+   "Cu1",
+   "Cu1",
+   "O2",
+   "O2",
+   "O2",
+   "O2",
+   "O3",
+   "O3",
+   "O3",
+   "O3"
+  ],
+  "parent_input_site": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13
+  ]
+ },
+ "supercell_matrix": [
+  [
+   -1,
+   0,
+   0
+  ],
+  [
+   0,
+   -1,
+   0
+  ],
+  [
+   1,
+   1,
+   2
+  ]
+ ],
+ "supercell_matrix_input": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   1,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "multiplicity": 2,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   2
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    1.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -1.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   1.0,
+   -1.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Cu layers (square): FM",
+   "Cu stacking along c: AFM stacking"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Cu",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Cu",
+    "index": 1,
+    "height_A": 6.615,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": -1
+   },
+   {
+    "element": "Cu",
+    "index": 2,
+    "height_A": 13.23,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Cu",
+    "index": 3,
+    "height_A": 19.845,
+    "lattice": "square",
+    "pattern": "FM",
+    "relation_to_layer0": -1
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 1010,
+  "msg_type": 4,
+  "n_operations": 32,
+  "primitive_volume": 189.03553199999993
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    -1,
+    0,
+    0
+   ],
+   [
+    0,
+    -1,
+    0
+   ],
+   [
+    1,
+    1,
+    2
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 2 chemical primitive cells.",
+  "The input (conventional) cell already contains it, but its centring translations are not magnetic translations.",
+  "Translation (1/2, 1/2, 1/2) centring is not a magnetic translation: it maps Cu1 (up) -> Cu1 (down)."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "4*0 1 -1 8*0",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "La",
+    "Cu",
+    "O"
+   ],
+   "species_counts": [
+    4,
+    2,
+    8
+   ]
+  }
+ }
+}

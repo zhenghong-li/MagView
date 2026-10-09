@@ -28,6 +28,7 @@ def main(argv=None) -> int:
     import os
 
     os.environ.setdefault("MAGVIEW_AUTOSAVE_DIR", str(out / "autosave"))
+    os.environ.setdefault("MAGVIEW_AGENTDFT_DIR", str(out / "agentdft_jobs"))
 
     import numpy as np
     from PySide6.QtCore import QPoint, Qt
@@ -191,6 +192,7 @@ def main(argv=None) -> int:
         phase2_checks(win, widget, check, shot, qpt)
         phase3_checks(win, widget, check, shot, qpt)
         phase4_checks(win, widget, check, shot, qpt)
+        phase5_checks(win, widget, check, shot, qpt, out)
 
     (out / "selftest.json").write_text(json.dumps(results, indent=2))
     win.close()
@@ -512,6 +514,62 @@ def phase4_checks(win, widget, check, shot, qpt) -> None:
         check("custom flips -> no canonical stacking", match.status == "no_match", match.reason)
     QTest.keyClick(win, Qt.Key_Escape)
     QTest.qWait(60)
+
+
+def phase5_checks(win, widget, check, shot, qpt, out) -> None:
+    """Minimal magnetic cell, preview, handoff save, mock AgentDFT submission."""
+    import json
+
+    import numpy as np
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from magview.core import interaction as ia
+    from magview.core.magcell import minimal_magnetic_cell
+    from magview.io.handoff import validate_handoff
+
+    doc = win.doc
+    win.set_mode(ia.Mode.VIEW)
+    QTest.keyClick(win, Qt.Key_A, Qt.ControlModifier)
+    QTest.qWait(40)
+    check("A-type along c applied for export", win.apply_pattern("A:c"))
+    QTest.qWait(60)
+    win.export_panel.analyze_btn.click()
+    QTest.qWait(150)
+    cell = win.mag_cell
+    ref = minimal_magnetic_cell(doc)
+    check("analyze: minimal magnetic cell", cell is not None and cell.multiplicity == ref.multiplicity == 2
+          and "REQUIRED" in win.export_panel.summary.text(), win.export_panel.summary.text())
+    check("handoff valid", win.handoff is not None and validate_handoff(win.handoff) == []
+          and win.handoff["requires_unfolding"] is True)
+    shot("13_export_analysis")
+    win.export_panel.preview.setChecked(True)
+    QTest.qWait(150)
+    n_parent = int(win.scene.model.atoms.parent.max()) + 1
+    check("preview shows the magnetic cell", win.previewing and n_parent == len(cell.species),
+          f"{n_parent} sites")
+    shot("14_magnetic_cell_preview")
+    win.export_panel.preview.setChecked(False)
+    QTest.qWait(100)
+    check("preview off restores the canvas", not win.previewing
+          and int(win.scene.model.atoms.parent.max()) + 1 == len(doc.canvas))
+    path = win.save_handoff_dialog(path=str(out / "handoff.json"))
+    data = json.loads(path.read_text()) if path else {}
+    check("handoff saved and re-validates", bool(path) and validate_handoff(data) == []
+          and data["multiplicity"] == 2)
+    ticket = win.submit_to_agentdft()
+    job_dir = Path(ticket.path) if ticket else None
+    check("mock AgentDFT: job stored, started (simulated)",
+          ticket is not None and ticket.status == "started (simulated)"
+          and (job_dir / "handoff.json").is_file() and (job_dir / "job.json").is_file(),
+          ticket.job_id if ticket else "")
+    check("bridge status round trip", ticket is not None
+          and win.bridge.status(ticket.job_id).status == "started (simulated)")
+    site = int(np.nonzero(doc.canvas_magnetic)[0][0])
+    doc.flip([site])
+    QTest.qWait(80)
+    check("an edit invalidates the analysis", win.mag_cell is None
+          and not win.export_panel.save_btn.isEnabled())
 
 
 import os  # noqa: E402  (used by phase2_checks)

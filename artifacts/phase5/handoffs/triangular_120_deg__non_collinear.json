@@ -1,0 +1,277 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/toy_triangular_Co.cif",
+  "sha256": "31a094c8beb93a1585c8f60465530c7296327ab4edd090f7bf5378bababe142c",
+  "formula": "Co",
+  "space_group": {
+   "number": 191,
+   "symbol": "P6/mmm"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    3.5,
+    0.0,
+    2.143131898507868e-16
+   ],
+   [
+    -1.7499999999999991,
+    3.0310889132455356,
+    2.143131898507868e-16
+   ],
+   [
+    0.0,
+    0.0,
+    6.0
+   ]
+  ],
+  "species": [
+   "Co"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Co0"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    3.5,
+    0.0,
+    2.143131898507868e-16
+   ],
+   [
+    -1.7499999999999991,
+    3.0310889132455356,
+    2.143131898507868e-16
+   ],
+   [
+    0.0,
+    0.0,
+    6.0
+   ]
+  ],
+  "species": [
+   "Co"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Co0"
+  ],
+  "description": "input cell (already primitive)",
+  "parent_input_site": [
+   0
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    1.7500000000000009,
+    3.0310889132455356,
+    4.286263797015736e-16
+   ],
+   [
+    -6.999999999999998,
+    6.062177826491071,
+    2.143131898507868e-16
+   ],
+   [
+    0.0,
+    0.0,
+    6.0
+   ]
+  ],
+  "species": [
+   "Co",
+   "Co",
+   "Co"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.3333333333,
+    0.3333333333,
+    0.0
+   ],
+   [
+    0.6666666667,
+    0.6666666667,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Co0",
+   "Co0",
+   "Co0"
+  ],
+  "parent_input_site": [
+   0,
+   0,
+   0
+  ]
+ },
+ "supercell_matrix": [
+  [
+   1,
+   1,
+   0
+  ],
+  [
+   -1,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "supercell_matrix_input": [
+  [
+   1,
+   1,
+   0
+  ],
+  [
+   -1,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "multiplicity": 3,
+ "canvas_matrix": [
+  [
+   3,
+   0,
+   0
+  ],
+  [
+   0,
+   3,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    2.0,
+    0.0,
+    0.0
+   ],
+   [
+    -1.0,
+    -1.732051,
+    0.0
+   ],
+   [
+    -1.0,
+    1.732051,
+    0.0
+   ]
+  ],
+  "collinear": false,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": null
+ },
+ "patterns": {
+  "labels": [
+   "non-collinear (no canonical label)"
+  ],
+  "stacking_axis": "c",
+  "layers": []
+ },
+ "magnetic_symmetry": {
+  "uni_number": 289,
+  "msg_type": 3,
+  "n_operations": 4,
+  "primitive_volume": 190.95860153446864
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    1,
+    1,
+    0
+   ],
+   [
+    -1,
+    2,
+    0
+   ],
+   [
+    0,
+    0,
+    1
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 3 chemical primitive cells.",
+  "Relative to the input cell: [[1, 1, 0], [-1, 2, 0], [0, 0, 1]].",
+  "Translation a is not a magnetic translation: it maps Co0 ([2.0, 0.0, 0.0]) -> Co0 ([-1.0, 1.73, 0.0]).",
+  "Translation b is not a magnetic translation: it maps Co0 ([2.0, 0.0, 0.0]) -> Co0 ([-1.0, -1.73, 0.0])."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": true,
+   "MAGMOM": "2 2*0 -1 -1.732 0 -1 1.732 0",
+   "SAXIS": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "note": "Three components per site in the SAXIS = (0,0,1) frame, i.e. Cartesian x, y, z.",
+   "species_order": [
+    "Co"
+   ],
+   "species_counts": [
+    3
+   ]
+  }
+ }
+}

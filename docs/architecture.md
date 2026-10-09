@@ -36,7 +36,7 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 - **Minimal-cell analysis** (Phase 5) works on the spglib primitive lattice, so centering translations count.
 - **VESTA data** is read at runtime and never stored in the repository.
 
-## Modules (✓ = exists)
+## Modules (all phases complete)
 
 | Module | Phase | Role |
 |---|---|---|
@@ -50,14 +50,14 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `core/magnetic.py` ✓, `core/batch.py` ✓, `core/project.py` ✓, `core/graph.py` ✓ | 2 | drag math, batch patterns, save/load, neighbour graphs + sign propagation |
 | `core/lattice2d.py` ✓, `core/layers.py` ✓, `core/patterns.py` ✓ | 2–3 | 2D lattice classification + pattern library; layer decomposition; rule-based matcher |
 | `core/stacking.py` ✓ | 4 | inter-layer bonds, FM-stacking reference (frustration/periodicity checks), stacking library + matcher |
-| `core/magcell.py` | 5 | minimal magnetic supercell + explanation |
+| `core/magcell.py` ✓ | 5 | minimal magnetic supercell (primitive-lattice translations, HNF, LLL), explanation, spglib MSG cross-check |
 | `style/vesta_ini.py` ✓, `style/elements.py` ✓, `style/theme.py` ✓, `style/appearance.py` ✓ | 0 | appearance |
 | `render/model.py` ✓, `render/scene.py` ✓, `render/arrows.py` ✓, `render/camera.py` ✓, `render/offscreen.py` ✓ | 0 | drawing |
 | `render/picking.py` ✓, `render/overlay.py` ✓ | 1 | pick → site, rubber-band projection |
 | `render/layer_view.py` ✓ | 3 | top view of one layer: up/down discs, pinned rings, NN bonds, preview |
-| `io/handoff.py`, `bridge/agentdft.py` | 5 | handoff JSON + schema; mock AgentDFT bridge |
+| `io/handoff.py` ✓ + `io/handoff.schema.json` ✓, `bridge/agentdft.py` ✓ | 5 | handoff JSON (schema + semantic validation, pattern labels, VASP hints); AgentDFT interface + mock |
 | `gui/main_window.py` ✓, `gui/app.py` ✓ | 0 | shell: main view, reference view, open, view buttons |
-| `gui/viewport.py` ✓, `gui/panels/{suggestion,moment,layer}_panel.py` ✓, `gui/selftest.py` ✓, stacking/export panels | 1–5 | interaction wiring, side panels |
+| `gui/viewport.py` ✓, `gui/panels/{suggestion,moment,layer,export}_panel.py` ✓, `gui/selftest.py` ✓ | 1–5 | interaction wiring, side panels |
 
 ## Interaction path (Phase 1)
 

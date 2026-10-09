@@ -1,0 +1,281 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": null,
+  "sha256": null,
+  "formula": "Mn",
+  "space_group": {
+   "number": 221,
+   "symbol": "Pm-3m"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    4.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    4.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    4.0
+   ]
+  ],
+  "species": [
+   "Mn"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Mn"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    4.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    4.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.0,
+    4.0
+   ]
+  ],
+  "species": [
+   "Mn"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Mn"
+  ],
+  "description": "input cell (already primitive)",
+  "parent_input_site": [
+   0
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    4.0,
+    0.0,
+    4.0
+   ],
+   [
+    0.0,
+    4.0,
+    4.0
+   ],
+   [
+    0.0,
+    -4.0,
+    4.0
+   ]
+  ],
+  "species": [
+   "Mn",
+   "Mn"
+  ],
+  "frac_coords": [
+   [
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    0.0,
+    0.5,
+    0.5
+   ]
+  ],
+  "labels": [
+   "Mn",
+   "Mn"
+  ],
+  "parent_input_site": [
+   0,
+   0
+  ]
+ },
+ "supercell_matrix": [
+  [
+   1,
+   0,
+   1
+  ],
+  [
+   0,
+   1,
+   1
+  ],
+  [
+   0,
+   -1,
+   1
+  ]
+ ],
+ "supercell_matrix_input": [
+  [
+   1,
+   0,
+   1
+  ],
+  [
+   0,
+   1,
+   1
+  ],
+  [
+   0,
+   -1,
+   1
+  ]
+ ],
+ "multiplicity": 2,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   2
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    4.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -4.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   4.0,
+   -4.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Mn layers (square): Neel (checkerboard)",
+   "Mn stacking along c: AFM stacking"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Mn",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "square",
+    "pattern": "Neel (checkerboard)",
+    "relation_to_layer0": 1
+   },
+   {
+    "element": "Mn",
+    "index": 1,
+    "height_A": 4.0,
+    "lattice": "square",
+    "pattern": "Neel (checkerboard)",
+    "relation_to_layer0": -1
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 1623,
+  "msg_type": 4,
+  "n_operations": 96,
+  "primitive_volume": 127.99999999999997
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    1,
+    0,
+    1
+   ],
+   [
+    0,
+    1,
+    1
+   ],
+   [
+    0,
+    -1,
+    1
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 2 chemical primitive cells.",
+  "Relative to the input cell: [[1, 0, 1], [0, 1, 1], [0, -1, 1]].",
+  "Translation a is not a magnetic translation: it maps Mn (up) -> Mn (down).",
+  "Translation b is not a magnetic translation: it maps Mn (up) -> Mn (down).",
+  "Translation c is not a magnetic translation: it maps Mn (up) -> Mn (down)."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "4 -4",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "Mn"
+   ],
+   "species_counts": [
+    2
+   ]
+  }
+ }
+}

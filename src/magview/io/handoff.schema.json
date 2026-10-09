@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://magview.local/schemas/handoff-1.0.json",
+  "title": "MagView -> AgentDFT handoff",
+  "description": "Final magnetic configuration for a DFT backend. Cells are given as lattice rows (Angstrom) plus fractional coordinates; moments are Cartesian mu_B per magnetic-cell site, in the same order as magnetic_cell.species (grouped by species, POSCAR order).",
+  "type": "object",
+  "required": ["schema", "schema_version", "created_utc", "generator", "source", "input_cell",
+               "reference_cell", "magnetic_cell", "supercell_matrix", "multiplicity", "moments",
+               "patterns", "requires_unfolding", "explanation", "dft_hints"],
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "ivec3": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+    "mat3": {"type": "array", "items": {"$ref": "#/$defs/vec3"}, "minItems": 3, "maxItems": 3},
+    "imat3": {"type": "array", "items": {"$ref": "#/$defs/ivec3"}, "minItems": 3, "maxItems": 3},
+    "cell": {
+      "type": "object",
+      "required": ["lattice", "species", "frac_coords", "labels"],
+      "properties": {
+        "lattice": {"$ref": "#/$defs/mat3"},
+        "species": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+        "frac_coords": {"type": "array", "items": {"$ref": "#/$defs/vec3"}, "minItems": 1},
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "description": {"type": "string"},
+        "parent_input_site": {"type": "array", "items": {"type": "integer", "minimum": 0}}
+      }
+    }
+  },
+  "properties": {
+    "schema": {"const": "magview.handoff"},
+    "schema_version": {"const": "1.0"},
+    "created_utc": {"type": "string"},
+    "generator": {
+      "type": "object", "required": ["name", "version"],
+      "properties": {"name": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "source": {
+      "type": "object", "required": ["formula", "space_group"],
+      "properties": {
+        "file": {"type": ["string", "null"]},
+        "sha256": {"type": ["string", "null"]},
+        "formula": {"type": "string"},
+        "space_group": {
+          "type": "object", "required": ["number", "symbol"],
+          "properties": {"number": {"type": "integer", "minimum": 1, "maximum": 230},
+                         "symbol": {"type": "string"}}
+        }
+      }
+    },
+    "input_cell": {"$ref": "#/$defs/cell"},
+    "reference_cell": {"$ref": "#/$defs/cell"},
+    "magnetic_cell": {
+      "allOf": [{"$ref": "#/$defs/cell"}, {"required": ["parent_input_site"]}]
+    },
+    "supercell_matrix": {"$ref": "#/$defs/imat3",
+                         "description": "magnetic_cell.lattice = supercell_matrix @ reference_cell.lattice"},
+    "supercell_matrix_input": {"oneOf": [{"$ref": "#/$defs/imat3"}, {"type": "null"}],
+                               "description": "magnetic_cell.lattice = M @ input_cell.lattice, if integral"},
+    "multiplicity": {"type": "integer", "minimum": 1},
+    "canvas_matrix": {"$ref": "#/$defs/imat3"},
+    "moments": {
+      "type": "object",
+      "required": ["frame", "unit", "vectors", "collinear", "spin_axis"],
+      "properties": {
+        "frame": {"const": "cartesian"},
+        "unit": {"const": "mu_B"},
+        "vectors": {"type": "array", "items": {"$ref": "#/$defs/vec3"}},
+        "collinear": {"type": "boolean"},
+        "spin_axis": {"$ref": "#/$defs/vec3"},
+        "signed_magnitudes": {"oneOf": [{"type": "array", "items": {"type": "number"}}, {"type": "null"}]}
+      }
+    },
+    "patterns": {
+      "type": "object",
+      "required": ["labels", "layers"],
+      "properties": {
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "stacking_axis": {"type": "string"},
+        "layers": {"type": "array", "items": {
+          "type": "object",
+          "required": ["element", "index", "lattice", "pattern"],
+          "properties": {
+            "element": {"type": "string"}, "index": {"type": "integer"},
+            "height_A": {"type": "number"}, "lattice": {"type": "string"},
+            "pattern": {"type": ["string", "null"]}, "relation_to_layer0": {"type": ["integer", "null"]}
+          }
+        }}
+      }
+    },
+    "magnetic_symmetry": {"type": ["object", "null"]},
+    "requires_unfolding": {"type": "boolean"},
+    "unfolding": {"oneOf": [{"type": "null"}, {
+      "type": "object",
+      "required": ["supercell_matrix", "reference"],
+      "properties": {
+        "supercell_matrix": {"$ref": "#/$defs/imat3"},
+        "reference": {"const": "reference_cell"},
+        "note": {"type": "string"}
+      }
+    }]},
+    "explanation": {"type": "array", "items": {"type": "string"}},
+    "dft_hints": {
+      "type": "object",
+      "properties": {
+        "vasp": {
+          "type": "object",
+          "required": ["ISPIN", "LNONCOLLINEAR", "MAGMOM", "species_order"],
+          "properties": {
+            "ISPIN": {"const": 2},
+            "LNONCOLLINEAR": {"type": "boolean"},
+            "MAGMOM": {"type": "string"},
+            "SAXIS": {"$ref": "#/$defs/vec3"},
+            "species_order": {"type": "array", "items": {"type": "string"}},
+            "species_counts": {"type": "array", "items": {"type": "integer"}},
+            "note": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

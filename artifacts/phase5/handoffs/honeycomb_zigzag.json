@@ -1,0 +1,314 @@
+{
+ "schema": "magview.handoff",
+ "schema_version": "1.0",
+ "created_utc": "2026-10-09T12:33:41+00:00",
+ "generator": {
+  "name": "MagView",
+  "version": "0.0.1"
+ },
+ "source": {
+  "file": "/workspace/magview/tests/data/toy_honeycomb_Cr.cif",
+  "sha256": "2b410f6ae9655df8378a20ed22f28db58daaa9d00fb19401a8fa54c9b1f1c281",
+  "formula": "Cr",
+  "space_group": {
+   "number": 191,
+   "symbol": "P6/mmm"
+  }
+ },
+ "input_cell": {
+  "lattice": [
+   [
+    5.88897275,
+    0.0,
+    3.605955814276743e-16
+   ],
+   [
+    -2.944486374999998,
+    5.100000003694307,
+    3.605955814276743e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cr",
+   "Cr"
+  ],
+  "frac_coords": [
+   [
+    0.3333333333,
+    0.6666666667,
+    0.0
+   ],
+   [
+    0.6666666667,
+    0.3333333333,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cr0",
+   "Cr0"
+  ]
+ },
+ "reference_cell": {
+  "lattice": [
+   [
+    5.88897275,
+    0.0,
+    3.605955814276743e-16
+   ],
+   [
+    -2.944486374999998,
+    5.100000003694307,
+    3.605955814276743e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cr",
+   "Cr"
+  ],
+  "frac_coords": [
+   [
+    0.3333333333,
+    0.6666666667,
+    0.0
+   ],
+   [
+    0.6666666667,
+    0.3333333333,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cr0",
+   "Cr0"
+  ],
+  "description": "input cell (already primitive)",
+  "parent_input_site": [
+   0,
+   1
+  ]
+ },
+ "magnetic_cell": {
+  "lattice": [
+   [
+    5.88897275,
+    0.0,
+    3.605955814276743e-16
+   ],
+   [
+    -5.888972749999996,
+    10.200000007388613,
+    7.211911628553486e-16
+   ],
+   [
+    0.0,
+    0.0,
+    8.0
+   ]
+  ],
+  "species": [
+   "Cr",
+   "Cr",
+   "Cr",
+   "Cr"
+  ],
+  "frac_coords": [
+   [
+    0.3333333333,
+    0.3333333333,
+    0.0
+   ],
+   [
+    0.6666666667,
+    0.1666666667,
+    0.0
+   ],
+   [
+    0.3333333333,
+    0.8333333333,
+    0.0
+   ],
+   [
+    0.6666666667,
+    0.6666666667,
+    0.0
+   ]
+  ],
+  "labels": [
+   "Cr0",
+   "Cr0",
+   "Cr0",
+   "Cr0"
+  ],
+  "parent_input_site": [
+   0,
+   1,
+   0,
+   1
+  ]
+ },
+ "supercell_matrix": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "supercell_matrix_input": [
+  [
+   1,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "multiplicity": 2,
+ "canvas_matrix": [
+  [
+   2,
+   0,
+   0
+  ],
+  [
+   0,
+   2,
+   0
+  ],
+  [
+   0,
+   0,
+   1
+  ]
+ ],
+ "moments": {
+  "frame": "cartesian",
+  "unit": "mu_B",
+  "vectors": [
+   [
+    0.0,
+    0.0,
+    3.0
+   ],
+   [
+    0.0,
+    0.0,
+    3.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -3.0
+   ],
+   [
+    -0.0,
+    -0.0,
+    -3.0
+   ]
+  ],
+  "collinear": true,
+  "spin_axis": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "signed_magnitudes": [
+   3.0,
+   3.0,
+   -3.0,
+   -3.0
+  ]
+ },
+ "patterns": {
+  "labels": [
+   "Cr layers (honeycomb): zigzag: AFM bonds along [120]",
+   "Cr stacking along c: FM stacking"
+  ],
+  "stacking_axis": "c",
+  "layers": [
+   {
+    "element": "Cr",
+    "index": 0,
+    "height_A": 0.0,
+    "lattice": "honeycomb",
+    "pattern": "zigzag: AFM bonds along [120]",
+    "relation_to_layer0": 1
+   }
+  ]
+ },
+ "magnetic_symmetry": {
+  "uni_number": 400,
+  "msg_type": 4,
+  "n_operations": 16,
+  "primitive_volume": 480.5401767480905
+ },
+ "requires_unfolding": true,
+ "unfolding": {
+  "supercell_matrix": [
+   [
+    1,
+    0,
+    0
+   ],
+   [
+    0,
+    2,
+    0
+   ],
+   [
+    0,
+    0,
+    1
+   ]
+  ],
+  "reference": "reference_cell",
+  "note": "Unfold bands from magnetic_cell onto reference_cell: A_super = S @ A_ref; reference k-points K map to supercell k = S K (fractional, mod reciprocal lattice)."
+ },
+ "explanation": [
+  "A magnetic supercell is required: 2 chemical primitive cells.",
+  "Relative to the input cell: [[1, 0, 0], [0, 2, 0], [0, 0, 1]].",
+  "Translation b is not a magnetic translation: it maps Cr0 (up) -> Cr0 (down)."
+ ],
+ "dft_hints": {
+  "vasp": {
+   "ISPIN": 2,
+   "LNONCOLLINEAR": false,
+   "MAGMOM": "2*3 2*-3",
+   "note": "MAGMOM entries follow magnetic_cell site order (POSCAR order). For spin-orbit runs set SAXIS to moments.spin_axis.",
+   "species_order": [
+    "Cr"
+   ],
+   "species_counts": [
+    4
+   ]
+  }
+ }
+}

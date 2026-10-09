@@ -45,7 +45,11 @@ from magview.core.stacking import fm_reference, match_stacking, relation, stacki
 from magview.core.selection import apply_selection  # noqa: E402
 from magview.core.structure import CrystalStructure, StructureLoadError  # noqa: E402
 from magview.core.suggest import ElementRuleSuggester  # noqa: E402
+from magview.bridge.agentdft import HandoffRejected, MockAgentDFTBridge  # noqa: E402
+from magview.core.magcell import as_structure, minimal_magnetic_cell  # noqa: E402
+from magview.gui.panels.export_panel import ExportPanel  # noqa: E402
 from magview.gui.panels.layer_panel import LayerPanel  # noqa: E402
+from magview.io.handoff import HandoffError, build_handoff, save_handoff  # noqa: E402
 from magview.gui.panels.moment_panel import MomentPanel  # noqa: E402
 from magview.gui.panels.suggestion_panel import SuggestionPanel  # noqa: E402
 from magview.gui.viewport import EditorViewport, ViewportCallbacks  # noqa: E402
@@ -139,6 +143,10 @@ class MainWindow(QMainWindow):
         self.current_layer = 0
         self.layer_match: MatchResult | None = None
         self._main_dirty = False
+        self.mag_cell = None
+        self.handoff: dict | None = None
+        self.previewing = False
+        self.bridge = MockAgentDFTBridge()
         self.autosave_enabled = os.environ.get(project.ENV_AUTOSAVE_DIR, "") != "off"
         self.suggester = ElementRuleSuggester()
         self.settings = QSettings("MagView", "MagView")
@@ -200,10 +208,22 @@ class MainWindow(QMainWindow):
             self.addDockWidget(Qt.LeftDockWidgetArea, d)
         self.tabifyDockWidget(self.sug_dock, self.mom_dock)
         self.tabifyDockWidget(self.mom_dock, self.layer_dock)
+        self.export_panel = ExportPanel()
+        self.export_dock = QDockWidget("Export", self)
+        self.export_dock.setObjectName("export_dock")
+        self.export_dock.setWidget(self.export_panel)
+        self.export_dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.export_dock)
+        self.tabifyDockWidget(self.layer_dock, self.export_dock)
         self.sug_dock.raise_()
         self.resizeDocks([self.sug_dock, ref_dock], [430, 320], Qt.Horizontal)
         self._wire_moment_panel()
         self._wire_layer_panel()
+        e = self.export_panel
+        e.analyze.connect(self.analyze_magnetic_cell)
+        e.preview_toggled.connect(self.preview_magnetic_cell)
+        e.save_handoff.connect(lambda: self.save_handoff_dialog())
+        e.submit.connect(self.submit_to_agentdft)
 
         self.selection_label = QLabel("")
         self.statusBar().addPermanentWidget(self.selection_label)
@@ -222,7 +242,9 @@ class MainWindow(QMainWindow):
                           triggered=lambda: self.save_session(ask=True))
         shot_act = QAction("Save &image...", self, triggered=self.save_image_dialog)
         quit_act = QAction("&Quit", self, shortcut=QKeySequence.Quit, triggered=self.close)
-        file_menu.addActions([open_act, self.save_act, save_as, shot_act])
+        handoff_act = QAction("Export AgentDFT &handoff...", self,
+                              triggered=lambda: self.save_handoff_dialog())
+        file_menu.addActions([open_act, self.save_act, save_as, shot_act, handoff_act])
         file_menu.addSeparator()
         file_menu.addAction(quit_act)
 
@@ -324,6 +346,10 @@ class MainWindow(QMainWindow):
             self.editor.set_mode(ia.Mode.VIEW)
         self.layers = None
         self.current_layer = 0
+        self.mag_cell = None
+        self.handoff = None
+        self.previewing = False
+        self.export_panel.invalidate()
         self.doc = doc
         self.session_path = session_path
         doc.history.subscribe(self._on_history)
@@ -376,6 +402,8 @@ class MainWindow(QMainWindow):
 
     # -- selection ----------------------------------------------------------------
     def _on_select(self, sites: list[int], op: ia.SelectOp, click: bool = False) -> None:
+        if self.previewing:
+            return  # the preview shows magnetic-cell sites, not canvas sites
         if self.in_layer_mode and click and len(sites) == 1 and self.layer is not None \
                 and sites[0] in set(self.layer.sites.tolist()) and op == ia.SelectOp.REPLACE:
             sign = self.doc.layer_click(sites[0])
@@ -445,6 +473,8 @@ class MainWindow(QMainWindow):
 
     # -- modes ------------------------------------------------------------------------
     def set_mode(self, mode: ia.Mode) -> None:
+        if self.previewing and mode != ia.Mode.VIEW:
+            self.export_panel.preview.setChecked(False)  # leave the read-only preview first
         self.editor.set_mode(mode)
 
     def toggle_moment_mode(self) -> None:
@@ -632,6 +662,75 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Box-select sites of this layer first (long-press + drag)")
             return
         self.doc.layer_set(sites, sign)
+
+    # -- export / handoff -----------------------------------------------------------------
+    def analyze_magnetic_cell(self) -> bool:
+        if self.doc is None:
+            return False
+        try:
+            self.mag_cell = minimal_magnetic_cell(self.doc)
+            self.handoff = build_handoff(self.doc, self.mag_cell, axis=self.layer_axis)
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.warning(self, "Analysis failed", str(exc))
+            return False
+        self.export_panel.show_result(self.mag_cell, self.handoff)
+        self.export_dock.raise_()
+        self.statusBar().showMessage(f"Magnetic cell: {self.mag_cell.multiplicity} x primitive "
+                                     f"({self.mag_cell.describe_matrix()} of the input cell)")
+        return True
+
+    def preview_magnetic_cell(self, on: bool) -> None:
+        """Show the (read-only) magnetic cell with its moments in the main view."""
+        if on and self.mag_cell is None:
+            return
+        if self.editor.machine.mode != ia.Mode.VIEW:
+            self.editor.set_mode(ia.Mode.VIEW)
+        self.previewing = bool(on)
+        if on:
+            from magview.core.structure import CrystalStructure
+
+            crystal = CrystalStructure.from_pymatgen(as_structure(self.mag_cell))
+            model = build_scene_model(crystal, self.appearance, site_moments=self.mag_cell.moments,
+                                      moment_view=True)
+            self.scene.set_model(model, reset_camera=True)
+            self.editor.mode_overlay.show("MAGNETIC CELL PREVIEW (read-only) - untick in the Export "
+                                          "tab to return", (0.45, 0.35, 0.75))
+        else:
+            self.editor.mode_overlay.hide()
+            self._rebuild_main(reset_camera=True)
+        self.viewport.render()
+
+    def save_handoff_dialog(self, path: str | None = None) -> Path | None:
+        if self.handoff is None and not self.analyze_magnetic_cell():
+            return None
+        if path is None:
+            name, _ = QFileDialog.getSaveFileName(self, "Save AgentDFT handoff",
+                                                  f"{self.doc.crystal.name}.handoff.json",
+                                                  "Handoff JSON (*.json)")
+            if not name:
+                return None
+            path = name
+        try:
+            out = save_handoff(self.handoff, path)
+        except HandoffError as exc:
+            QMessageBox.critical(self, "Invalid handoff", "\n".join(exc.errors))
+            return None
+        self.statusBar().showMessage(f"Saved handoff {out}")
+        return out
+
+    def submit_to_agentdft(self):
+        if self.handoff is None and not self.analyze_magnetic_cell():
+            return None
+        try:
+            ticket = self.bridge.submit(self.handoff)
+        except HandoffRejected as exc:
+            QMessageBox.critical(self, "Handoff rejected", "\n".join(exc.report.errors))
+            return None
+        self.export_panel.job.setText(f"<b>Job {ticket.job_id}</b>: {ticket.status}<br>"
+                                      f"{ticket.history[-1]['detail']}<br><i>{ticket.message}</i><br>"
+                                      f"Stored in {ticket.path}")
+        self.statusBar().showMessage(f"AgentDFT (mock): job {ticket.job_id} {ticket.status}")
+        return ticket
 
     # -- moment drag ------------------------------------------------------------------
     def _on_drag(self, action) -> None:
@@ -946,6 +1045,13 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Redid: {label}")
 
     def _on_history(self) -> None:
+        if self.mag_cell is not None:
+            self.mag_cell = None
+            self.handoff = None
+            if self.previewing:
+                self.previewing = False
+                self.editor.mode_overlay.hide()
+            self.export_panel.invalidate()
         # Canvas may have changed: drop selections that no longer exist.
         n = len(self.doc.canvas)
         self.selection = frozenset(s for s in self.selection if s < n)

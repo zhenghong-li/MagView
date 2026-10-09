@@ -18,6 +18,7 @@ dependencies = [
     "PySide6-Essentials",
     "pyvistaqt",
     "QtPy",
+    "jsonschema",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,9 @@ magview = "magview.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+magview = ["io/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
