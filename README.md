@@ -1,5 +1,7 @@
 # MagView
 
+> **Start here:** `docs/reports/SUMMARY.md` (what was built, where the evidence is, how to run it on your host).
+
 MagView is a real-time crystal-structure editor modeled on VESTA, with an interactive **magnetic-ordering workflow**:
 
 1. It suggests which sites are magnetic.
