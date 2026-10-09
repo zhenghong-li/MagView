@@ -190,6 +190,7 @@ def main(argv=None) -> int:
     if not args.phase1_only:
         phase2_checks(win, widget, check, shot, qpt)
         phase3_checks(win, widget, check, shot, qpt)
+        phase4_checks(win, widget, check, shot, qpt)
 
     (out / "selftest.json").write_text(json.dumps(results, indent=2))
     win.close()
@@ -455,6 +456,62 @@ def phase3_checks(win, widget, check, shot, qpt) -> None:
     QTest.qWait(80)
     check("Esc leaves layer mode, 3D scene back", win.editor.machine.mode == ia.Mode.VIEW
           and win.editor.scene is win.scene and win.scene.actors["atoms"].GetVisibility())
+
+
+def phase4_checks(win, widget, check, shot, qpt) -> None:
+    """Stacking: reference, idle state, suggestion from one flipped site, apply, per-layer flip."""
+    import numpy as np
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from magview.core import interaction as ia
+    from magview.render.picking import pick_atom, project_to_display
+
+    doc = win.doc
+    ren = win.viewport.renderer
+    win.set_mode(ia.Mode.LAYER)
+    QTest.qWait(80)
+    win.select_layer(0)
+    L0 = win.layer
+    group = win.layers.by_element(L0.element)
+    n = len(group)
+    doc.apply_completion(L0.sites, np.ones(len(L0.sites), int), "test: layer 0 FM")
+    for G in group[1:]:
+        doc.clear_layer(G.sites)
+    QTest.qWait(60)
+    group, ref, match = win.stacking_state()
+    check("stacking reference from layer 0", ref.ok, ref.reason)
+    check("stacking idle until another layer is assigned", match.status == "idle", match.reason)
+
+    win.select_layer(win.layers.layers.index(group[1]))
+    QTest.qWait(60)
+    model = win.layer_scene.model
+    xy = project_to_display(ren, model.atoms.cart)
+    d = next(d for d in range(len(model.atoms)) if pick_atom(ren, model, round(xy[d][0]), round(xy[d][1])) == d)
+    for _ in range(2):  # unpinned -> up -> down
+        QTest.mouseClick(widget, Qt.LeftButton, Qt.NoModifier, qpt(*xy[d]))
+        QTest.qWait(80)
+    group, ref, match = win.stacking_state()
+    keys = {c.key for c in match.candidates}
+    check("one flipped site in layer 1 suggests AFM stacking",
+          match.relations[1] == -1 and "afm" in keys and "fm" not in keys,
+          f"relations {match.relations} -> {sorted(keys)}")
+    shot("12_stacking_suggestion")
+    win.layer_panel.stack_buttons["afm"].click()
+    QTest.qWait(80)
+    group, ref, match = win.stacking_state()
+    check("apply AFM stacking: layers alternate", list(match.relations) == [(-1) ** k for k in range(n)],
+          f"{match.relations}")
+    win.layer_panel.flip_btn.click()
+    QTest.qWait(80)
+    group, ref, match = win.stacking_state()
+    check("flip this layer (custom)", match.relations[1] == 1, f"{match.relations}")
+    if n == 2:
+        check("two layers both same -> FM suggested", {c.key for c in match.candidates} == {"fm"})
+    else:
+        check("custom flips -> no canonical stacking", match.status == "no_match", match.reason)
+    QTest.keyClick(win, Qt.Key_Escape)
+    QTest.qWait(60)
 
 
 import os  # noqa: E402  (used by phase2_checks)

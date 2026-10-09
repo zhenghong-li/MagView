@@ -245,3 +245,8 @@ class MagDocument:
     def apply_completion(self, sites, signs, label: str) -> None:
         """Set the spins of a whole layer (pins are kept as they are)."""
         self._spin_commit(label, sites, signs, None)
+
+    def flip_layer(self, sites) -> None:
+        """Multiply the spins of one layer by -1 (custom per-layer flip)."""
+        sites = np.asarray(sites, dtype=int)
+        self._spin_commit("Flip layer", sites, -self.spin_sign(sites), None)

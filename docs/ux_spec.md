@@ -98,6 +98,11 @@ These apply to the current selection. Each one is a single undo step.
   - Clicking applies it to the whole layer as one undo step.
   - On an unsupported net (e.g. the Cs3V9Te13 V trimer net) the panel says why and stays silent. **Nothing is applied automatically.**
 - **Stacking axis:** a, b or c (default c). Changing it recomputes the layers.
+- **Stacking box (Phase 4):**
+  - Shows the reference (layer 0 carried up along inter-layer bonds) or why there is none (frustrated / inconsistent).
+  - Lists each layer's relation: same / flipped / other order / unset.
+  - Has a button per stacking pattern (FM, AFM, double): disabled with the reason when invalid, bold "← suggested" when it agrees with the assigned layers, previewed on hover.
+  - "Flip this layer" is always available.
 
 ## 7. Keyboard summary
 
@@ -115,3 +120,4 @@ These apply to the current selection. Each one is a single undo step.
 | Overlay text avoids the `\|` character | VTK's text renderer treats `\|` specially, so "\|m\| = ..." rendered garbled. |
 | Patterns popover: entries that don't apply stay visible but disabled, with the reason as a tooltip | Required by §4 ("grayed out with the reason"). |
 | Interactor style registered through pyvista (`plotter.iren.style`) | pyvista re-applied its own trackball style after a layer redraw, which silently disabled clicks (found by the Phase 3 GUI self-test). |
+| Accept auto-fits the arrow scale once if arrows would hide inside the atoms | Cu at 1 μB with 1 Å/μB gave arrows shorter than the atom (Phase 4 renders). It happens on an explicit action only, so the "never rescale mid-drag" rule still holds. |

@@ -54,6 +54,16 @@ def apply(doc, sites, key):
     return opt
 
 
+def auto_scale(doc) -> float:
+    """Arrow scale so the longest arrow spans 80% of the shortest magnetic-magnetic distance."""
+    from magview.core.graph import neighbor_graph
+
+    mags = np.linalg.norm(doc.moments, axis=1)
+    sites = np.nonzero(mags > 0)[0]
+    g = neighbor_graph(doc.canvas.structure.lattice_matrix, doc.canvas.structure.frac_coords, sites)
+    return round(0.8 * g.d_nn / mags.max(), 2) if g.d_nn > 0 else 1.0
+
+
 def render_doc(doc, path, appearance, view="oblique", size=(700, 560), color_mode="sign",
                centered=True, scale=None, title=None, moment_view=True, tilt=0.0):
     from magview.render.arrows import ArrowStyle
@@ -65,6 +75,8 @@ def render_doc(doc, path, appearance, view="oblique", size=(700, 560), color_mod
     plotter.enable_anti_aliasing("ssaa")
     scene = StructureScene(plotter, appearance.theme)
     t = appearance.theme
+    if scale == "auto":
+        scale = auto_scale(doc)
     scene.arrow_style = ArrowStyle(scale or t.vector_scale, t.arrow_shaft_radius, t.arrow_head_radius_ratio,
                                    t.arrow_head_length_ratio, centered, t.arrow_resolution)
     scene.color_mode = color_mode

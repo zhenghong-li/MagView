@@ -41,6 +41,7 @@ from magview.core.document import MagDocument, NonCollinearError  # noqa: E402
 from magview.core.graph import neighbor_graph  # noqa: E402
 from magview.core.layers import LayerDecomposition, decompose  # noqa: E402
 from magview.core.patterns import MatchResult, match_layer  # noqa: E402
+from magview.core.stacking import fm_reference, match_stacking, relation, stacking_library  # noqa: E402
 from magview.core.selection import apply_selection  # noqa: E402
 from magview.core.structure import CrystalStructure, StructureLoadError  # noqa: E402
 from magview.core.suggest import ElementRuleSuggester  # noqa: E402
@@ -478,6 +479,10 @@ class MainWindow(QMainWindow):
         p.clear_layer.connect(lambda: self.doc and self.layers and
                               self.doc.clear_layer(self.layer.sites))
         p.set_selected.connect(self._layer_set_selected)
+        p.apply_stacking.connect(self.apply_stacking)
+        p.preview_stacking.connect(self._preview_stacking)
+        p.flip_layer.connect(lambda: self.doc and self.layer is not None and
+                             self.doc.flip_layer(self.layer.sites))
 
     @property
     def in_layer_mode(self) -> bool:
@@ -534,6 +539,7 @@ class MainWindow(QMainWindow):
         self.layer_match = match_layer(L, pins, labels)
         if preview is None:
             self.layer_panel.set_match(L.lattice.reason, self.layer_match)
+            self._refresh_stacking()
         selected = np.isin(L.sites, list(self.selection))
         self.layer_scene.show(self.doc.canvas.structure, L, self.layer_axis, signs, pinned,
                               preview=preview, reset_camera=reset_camera, selected=selected)
@@ -542,6 +548,45 @@ class MainWindow(QMainWindow):
             self.ref_scene.set_selection(np.nonzero(np.isin(self.ref_scene.model.atoms.parent, inputs))[0])
             self.reference.render()
         self.viewport.render()
+
+    def stacking_state(self):
+        """(group layers, reference, match) for the current layer's element."""
+        L = self.layer
+        group = self.layers.by_element(L.element)
+        base = self.doc.spin_sign(group[0].sites)
+        ref = fm_reference(self.doc.canvas.structure, group, self.layers.normal,
+                           self.layers.period, base)
+        match = None
+        if ref.ok:
+            rels = [relation(self.doc.spin_sign(G.sites), r) for G, r in zip(group, ref.signs)]
+            match = match_stacking(rels)
+        return group, ref, match
+
+    def _refresh_stacking(self) -> None:
+        group, ref, match = self.stacking_state()
+        self.layer_panel.set_stacking(self.layer.element, len(group), ref, match)
+
+    def apply_stacking(self, key: str) -> bool:
+        group, ref, _ = self.stacking_state()
+        lib = {p.key: (p, invalid) for p, invalid in stacking_library(len(group))}
+        if not ref.ok or key not in lib or lib[key][1]:
+            return False
+        pat = lib[key][0]
+        sites = np.concatenate([G.sites for G in group])
+        signs = np.concatenate([f * r for f, r in zip(pat.flips, ref.signs)])
+        self.doc.apply_completion(sites, signs, f"{group[0].element} layers: {pat.label}")
+        return True
+
+    def _preview_stacking(self, key: str) -> None:
+        if not key:
+            self._refresh_layer()
+            return
+        group, ref, _ = self.stacking_state()
+        lib = {p.key: p for p, _ in stacking_library(len(group))}
+        if not ref.ok or key not in lib:
+            return
+        k = [G.index for G in group].index(self.layer.index)
+        self._refresh_layer(preview=lib[key].flips[k] * ref.signs[k])
 
     def select_layer(self, index: int) -> None:
         if self.layers is None or not (0 <= index < len(self.layers.layers)):
@@ -842,6 +887,24 @@ class MainWindow(QMainWindow):
         if self.doc is not None:
             self.doc.accept_suggestions(items, magnitudes)
             self.mom_dock.raise_()
+            self._ensure_visible_arrows()
+
+    def _ensure_visible_arrows(self) -> None:
+        """Auto-fit the arrow scale once if arrows would hide inside the (moment-view) atoms.
+        Only on explicit actions (accept), never during a drag."""
+        mags = np.linalg.norm(self.doc.moments, axis=1)
+        if not mags.any():
+            return
+        t = self.appearance.theme
+        radius = max(self.appearance.elements[s].radius for s, on in
+                     zip(self.doc.crystal.symbols, self.doc.magnetic) if on)
+        shown = radius * t.ball_scale * t.moment_view_atom_scale
+        half = 0.5 if self.scene.arrow_style.centered else 1.0
+        if mags.max() * self.scene.arrow_style.scale * half < 1.6 * shown:
+            before = self.scene.arrow_style.scale
+            self.auto_fit_arrows()
+            self.statusBar().showMessage(f"Arrow scale auto-fitted {before:g} -> "
+                                         f"{self.scene.arrow_style.scale:g} A/muB so arrows are visible")
 
     def _clear_magnetic(self) -> None:
         if self.doc is not None:

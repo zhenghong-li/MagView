@@ -1,0 +1,227 @@
+[
+  {
+    "step": "click selects one site",
+    "ok": true,
+    "detail": "site 56"
+  },
+  {
+    "step": "shift-click adds",
+    "ok": true,
+    "detail": "[39, 56]"
+  },
+  {
+    "step": "drag rotates camera",
+    "ok": true,
+    "detail": "camera moved 49.127"
+  },
+  {
+    "step": "long-press arms box",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "box selects sites inside",
+    "ok": true,
+    "detail": "48 selected, 48 expected"
+  },
+  {
+    "step": "Esc clears selection",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "accept sets edited moments",
+    "ok": true,
+    "detail": "Ni0 (4a): |m| = [np.float64(1.7)]"
+  },
+  {
+    "step": "Ctrl+Z undoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+Y redoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "canvas 2x2x2 -> 1x1x1",
+    "ok": true,
+    "detail": "8 sites"
+  },
+  {
+    "step": "undo canvas resize",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+A selects magnetic sites",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "M enters moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag up sets +axis moment",
+    "ok": true,
+    "detail": "m = [0.0, 0.0, 3.34]"
+  },
+  {
+    "step": "drag is one undo step",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag down sets -axis moment",
+    "ok": true,
+    "detail": "m = [-0.0, -0.0, -3.34]"
+  },
+  {
+    "step": "Esc cancels a drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "dead zone: tiny drag changes nothing",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "non-collinear drag with X lock",
+    "ok": true,
+    "detail": "m = [-6.937, -0.0, -0.0]"
+  },
+  {
+    "step": "free non-collinear drag follows the cursor",
+    "ok": true,
+    "detail": "|m| = 3.24"
+  },
+  {
+    "step": "projected back to collinear",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "F flips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "0 zeroes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "drag on a selected atom sets the whole selection",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "patterns menu built",
+    "ok": true,
+    "detail": "9 entries"
+  },
+  {
+    "step": "apply pattern A-type along c",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "session save/load round trip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "autosave written after edits",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Esc exits moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "L enters layer mode",
+    "ok": true,
+    "detail": "Ni layer 0  h = 0.00 A  (8 sites, square)"
+  },
+  {
+    "step": "clear layer: nothing pinned",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "two parallel neighbours -> FM + stripe candidates",
+    "ok": true,
+    "detail": "['fm', 'stripe:[110]']"
+  },
+  {
+    "step": "antiparallel neighbours -> Neel + other stripe",
+    "ok": true,
+    "detail": "['neel', 'stripe:[1-10]']"
+  },
+  {
+    "step": "hover preview does not edit",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "apply Neel completes the layer (all NN bonds antiparallel)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "undo completion",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "right-click unsets a pin",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "PgDn steps to the next layer",
+    "ok": true,
+    "detail": "4 layers"
+  },
+  {
+    "step": "Esc leaves layer mode, 3D scene back",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "stacking reference from layer 0",
+    "ok": true,
+    "detail": "reference built from layer 0 through 4 layer(s)"
+  },
+  {
+    "step": "stacking idle until another layer is assigned",
+    "ok": true,
+    "detail": "assign a spin in another layer to get a stacking suggestion"
+  },
+  {
+    "step": "one flipped site in layer 1 suggests AFM stacking",
+    "ok": true,
+    "detail": "relations (1, -1, None, None) -> ['afm', 'uudd:1']"
+  },
+  {
+    "step": "apply AFM stacking: layers alternate",
+    "ok": true,
+    "detail": "(1, -1, 1, -1)"
+  },
+  {
+    "step": "flip this layer (custom)",
+    "ok": true,
+    "detail": "(1, 1, 1, -1)"
+  },
+  {
+    "step": "custom flips -> no canonical stacking",
+    "ok": true,
+    "detail": "no stacking pattern agrees with the assigned layers"
+  }
+]

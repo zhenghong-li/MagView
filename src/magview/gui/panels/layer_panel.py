@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from magview.core.patterns import MatchResult
+from magview.core.stacking import Reference, StackingMatch, stacking_library
 
 
 class _HoverButton(QPushButton):
@@ -41,6 +42,9 @@ class LayerPanel(QWidget):
     preview_candidate = Signal(int)  # -1 ends the preview
     clear_layer = Signal()
     set_selected = Signal(int)  # +1 / -1: pin the selected sites of this layer
+    apply_stacking = Signal(str)  # stacking pattern key
+    preview_stacking = Signal(str)  # "" ends the preview
+    flip_layer = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -89,9 +93,25 @@ class LayerPanel(QWidget):
         row.addWidget(self.up_btn)
         row.addWidget(self.down_btn)
         lay.addLayout(row)
+        self.stack_box = QGroupBox("Stacking between layers (rule-based)")
+        sl = QVBoxLayout(self.stack_box)
+        self.stack_ref = QLabel("")
+        self.stack_ref.setWordWrap(True)
+        self.stack_rel = QLabel("")
+        self.stack_rel.setWordWrap(True)
+        self.stack_status = QLabel("")
+        self.stack_status.setWordWrap(True)
+        sl.addWidget(self.stack_ref)
+        sl.addWidget(self.stack_rel)
+        sl.addWidget(self.stack_status)
+        self.stack_buttons_box = QVBoxLayout()
+        sl.addLayout(self.stack_buttons_box)
+        self.flip_btn = QPushButton("Flip this layer (custom per-layer flip)")
+        sl.addWidget(self.flip_btn)
+        lay.addWidget(self.stack_box)
         lay.addStretch(1)
-        self.stacking_slot = QVBoxLayout()  # filled by Phase 4
-        lay.addLayout(self.stacking_slot)
+        self.flip_btn.clicked.connect(self.flip_layer.emit)
+        self.stack_buttons: dict[str, _HoverButton] = {}
 
         self.axis.currentTextChanged.connect(self.axis_changed.emit)
         self.layers.currentRowChanged.connect(lambda r: r >= 0 and self.layer_selected.emit(r))
@@ -134,3 +154,37 @@ class LayerPanel(QWidget):
                 f"{e.pattern.label} ({e.reason})" for e in result.excluded))
         else:
             self.excluded.setText("")
+
+    def set_stacking(self, element: str, n_layers: int, ref: Reference, match: StackingMatch | None) -> None:
+        for b in self.stack_buttons.values():
+            self.stack_buttons_box.removeWidget(b)
+            b.deleteLater()
+        self.stack_buttons = {}
+        self.stack_box.setTitle(f"Stacking of the {n_layers} {element} layer(s) (reference: layer 0)")
+        if not ref.ok:
+            self.stack_ref.setText(f"<b>No reference:</b> {ref.reason}. Use per-layer flips.")
+            self.stack_rel.setText("")
+            self.stack_status.setText("")
+            return
+        self.stack_ref.setText(f"Reference = layer 0 transported along inter-layer bonds "
+                               f"(FM stacking).")
+        names = {1: "same", -1: "flipped", 0: "other order", None: "unset"}
+        rels = match.relations if match else ()
+        self.stack_rel.setText("Layers: " + ", ".join(
+            f"{k}: {'ref' if k == 0 else names[r]}" for k, r in enumerate(rels)))
+        status = {"idle": "Waiting", "no_match": "No match", "matches": "Suggestions"}[match.status]
+        self.stack_status.setText(f"<b>{status}:</b> {match.reason}")
+        suggested = {p.key for p in match.candidates}
+        reasons = {p.key: r for p, r in match.excluded}
+        for k, (pat, invalid) in enumerate(stacking_library(len(rels))):
+            star = "  <- suggested" if pat.key in suggested else ""
+            b = _HoverButton(f"Apply {pat.label}{star}", k)
+            b.setEnabled(invalid is None)
+            b.setToolTip(invalid or reasons.get(pat.key, "consistent with the assigned layers"))
+            if pat.key in suggested:
+                b.setStyleSheet("font-weight: bold")
+            b.clicked.connect(lambda _=False, key=pat.key: self.apply_stacking.emit(key))
+            b.hovered.connect(lambda _k, key=pat.key: self.preview_stacking.emit(key))
+            b.left.connect(lambda: self.preview_stacking.emit(""))
+            self.stack_buttons_box.addWidget(b)
+            self.stack_buttons[pat.key] = b

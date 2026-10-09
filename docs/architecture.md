@@ -49,7 +49,7 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `core/suggest.py` ✓ | 1 | magnetic-site suggestion (rule-based) |
 | `core/magnetic.py` ✓, `core/batch.py` ✓, `core/project.py` ✓, `core/graph.py` ✓ | 2 | drag math, batch patterns, save/load, neighbour graphs + sign propagation |
 | `core/lattice2d.py` ✓, `core/layers.py` ✓, `core/patterns.py` ✓ | 2–3 | 2D lattice classification + pattern library; layer decomposition; rule-based matcher |
-| `core/stacking.py` | 4 | inter-layer stacking and its matcher |
+| `core/stacking.py` ✓ | 4 | inter-layer bonds, FM-stacking reference (frustration/periodicity checks), stacking library + matcher |
 | `core/magcell.py` | 5 | minimal magnetic supercell + explanation |
 | `style/vesta_ini.py` ✓, `style/elements.py` ✓, `style/theme.py` ✓, `style/appearance.py` ✓ | 0 | appearance |
 | `render/model.py` ✓, `render/scene.py` ✓, `render/arrows.py` ✓, `render/camera.py` ✓, `render/offscreen.py` ✓ | 0 | drawing |
