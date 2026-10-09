@@ -1,28 +1,30 @@
 """MagView main window.
 
 Layout: the main viewport shows the editing canvas (default 2x2x2 input cells,
-light grid lines mark the input cells); the right dock holds the reference view
-(the full input cell) and structure info; the left dock holds the magnetic-site
-suggestions. Selection is view state; every edit goes through the document's
-undo history.
+light grid lines mark the input cells). The right dock holds the reference view
+(the full input cell) and structure info. The left dock has tabs for the
+magnetic-site suggestions and the Moments panel. Selection is view state; every
+edit goes through the document's undo history and triggers a recovery autosave.
 """
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 os.environ.setdefault("QT_API", "pyside6")
 
 import numpy as np  # noqa: E402
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtGui import QAction, QKeySequence  # noqa: E402
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt  # noqa: E402
+from PySide6.QtGui import QAction, QCursor, QKeySequence  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QDockWidget,
     QFileDialog,
     QInputDialog,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QVBoxLayout,
     QWidget,
@@ -31,20 +33,81 @@ from pyvistaqt import QtInteractor  # noqa: E402
 
 from magview import __version__  # noqa: E402
 from magview.core import interaction as ia  # noqa: E402
+from magview.core import magnetic as mg  # noqa: E402
+from magview.core import project  # noqa: E402
+from magview.core.batch import PatternOption, pattern_options  # noqa: E402
 from magview.core.canvas import CanvasResizeError  # noqa: E402
-from magview.core.document import MagDocument  # noqa: E402
+from magview.core.document import MagDocument, NonCollinearError  # noqa: E402
+from magview.core.graph import neighbor_graph  # noqa: E402
 from magview.core.selection import apply_selection  # noqa: E402
 from magview.core.structure import CrystalStructure, StructureLoadError  # noqa: E402
 from magview.core.suggest import ElementRuleSuggester  # noqa: E402
+from magview.gui.panels.moment_panel import MomentPanel  # noqa: E402
 from magview.gui.panels.suggestion_panel import SuggestionPanel  # noqa: E402
 from magview.gui.viewport import EditorViewport, ViewportCallbacks  # noqa: E402
+from magview.render.arrows import ArrowStyle  # noqa: E402
 from magview.render.camera import VIEWS  # noqa: E402
 from magview.render.model import build_scene_model, subcell_edges  # noqa: E402
+from magview.render.overlay import CursorLabel  # noqa: E402
+from magview.render.picking import display_ray  # noqa: E402
 from magview.render.scene import StructureScene  # noqa: E402
 from magview.style.appearance import Appearance  # noqa: E402
 
-FILE_FILTER = "Structures (*.cif *.vasp *.poscar POSCAR* CONTCAR*);;All files (*)"
+FILE_FILTER = ("Structures and sessions (*.cif *.vasp *.poscar POSCAR* CONTCAR* *.magview.json);;"
+               "All files (*)")
 CANVAS_PRESETS = [(1, 1, 1), (2, 2, 1), (2, 2, 2), (3, 3, 1)]
+LOCK_KEYS = {Qt.Key_X: "x", Qt.Key_Y: "y", Qt.Key_Z: "z", Qt.Key_A: "a", Qt.Key_B: "b", Qt.Key_C: "c"}
+
+
+@dataclass
+class DragState:
+    frame: mg.DragFrame
+    targets: np.ndarray  # canvas sites receiving the moment
+    original: np.ndarray  # document moments at drag start
+    result: mg.DragResult | None = None
+
+
+class _ViewportKeys(QObject):
+    """Keyboard handling for the 3D viewport: axis locks are held keys during a drag,
+    other letters are commands (B box, M moment mode, F flip, 0 zero, P patterns, E equivalent)."""
+
+    def __init__(self, window: "MainWindow") -> None:
+        super().__init__(window)
+        self.w = window
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt naming)
+        et = event.type()
+        if et not in (QEvent.KeyPress, QEvent.KeyRelease):
+            return False
+        if event.modifiers() & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier):
+            return False  # leave Ctrl+Z etc. to the window shortcuts
+        key = event.key()
+        if et == QEvent.KeyRelease:
+            if not event.isAutoRepeat() and LOCK_KEYS.get(key) == self.w.axis_lock:
+                self.w.axis_lock = None
+                self.w._refresh_drag()
+            return key in LOCK_KEYS or key in (Qt.Key_M, Qt.Key_F, Qt.Key_0, Qt.Key_P, Qt.Key_E)
+        if event.isAutoRepeat():
+            return True
+        if self.w._drag is not None and key in LOCK_KEYS:
+            self.w.axis_lock = LOCK_KEYS[key]
+            self.w._refresh_drag()
+            return True
+        if key == Qt.Key_B:
+            self.w._arm_box()
+        elif key == Qt.Key_M:
+            self.w.toggle_moment_mode()
+        elif key == Qt.Key_F:
+            self.w.flip_selection()
+        elif key == Qt.Key_0:
+            self.w.zero_selection()
+        elif key == Qt.Key_P:
+            self.w.show_patterns_menu()
+        elif key == Qt.Key_E:
+            self.w.select_equivalent()
+        else:
+            return key in LOCK_KEYS  # swallow lone axis letters (VTK must not see them)
+        return True
 
 
 class MainWindow(QMainWindow):
@@ -52,11 +115,18 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.appearance = appearance or Appearance.load()
         self.doc: MagDocument | None = None
+        self.session_path: Path | None = None
         self.selection: frozenset[int] = frozenset()
         self.moment_view = False
+        self._moment_view_before_mode = False
+        self.axis_lock: str | None = None
+        self._drag: DragState | None = None
+        self._drag_pos: tuple | None = None
+        self.autosave_enabled = os.environ.get(project.ENV_AUTOSAVE_DIR, "") != "off"
         self.suggester = ElementRuleSuggester()
+        self.settings = QSettings("MagView", "MagView")
         self.setWindowTitle(f"MagView {__version__}")
-        self.resize(1440, 860)
+        self.resize(1480, 900)
 
         # Main 3D view: the editing canvas.
         self.viewport = QtInteractor(self)
@@ -64,7 +134,11 @@ class MainWindow(QMainWindow):
         self.scene = StructureScene(self.viewport, self.appearance.theme)
         self.editor = EditorViewport(self.viewport, self.scene, ViewportCallbacks(
             select=self._on_select, clear=self._on_clear, info=self._on_info,
-            mode_changed=self._on_mode_changed), self.appearance.theme)
+            mode_changed=self._on_mode_changed, drag=self._on_drag,
+            context_menu=self._context_menu), self.appearance.theme)
+        self.cursor_label = CursorLabel(self.viewport.renderer)
+        self._keys = _ViewportKeys(self)
+        self.viewport.installEventFilter(self._keys)
 
         # Right dock: reference view of the full input cell + structure info.
         self.reference = QtInteractor(self)
@@ -88,20 +162,29 @@ class MainWindow(QMainWindow):
         ref_dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
         self.addDockWidget(Qt.RightDockWidgetArea, ref_dock)
 
-        # Left dock: magnetic-site suggestions.
+        # Left dock: suggestions and moments (tabs).
         self.suggestions = SuggestionPanel()
         self.suggestions.accepted.connect(self._accept_suggestions)
         self.suggestions.skipped.connect(lambda: self.statusBar().showMessage("Suggestions skipped"))
-        sug_dock = QDockWidget("Magnetic sites", self)
-        sug_dock.setObjectName("suggestion_dock")
-        sug_dock.setWidget(self.suggestions)
-        sug_dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
-        self.addDockWidget(Qt.LeftDockWidgetArea, sug_dock)
-        self.resizeDocks([sug_dock, ref_dock], [430, 320], Qt.Horizontal)
+        self.sug_dock = QDockWidget("Magnetic sites", self)
+        self.sug_dock.setObjectName("suggestion_dock")
+        self.sug_dock.setWidget(self.suggestions)
+        self.moments_panel = MomentPanel()
+        self.mom_dock = QDockWidget("Moments", self)
+        self.mom_dock.setObjectName("moment_dock")
+        self.mom_dock.setWidget(self.moments_panel)
+        for d in (self.sug_dock, self.mom_dock):
+            d.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
+            self.addDockWidget(Qt.LeftDockWidgetArea, d)
+        self.tabifyDockWidget(self.sug_dock, self.mom_dock)
+        self.sug_dock.raise_()
+        self.resizeDocks([self.sug_dock, ref_dock], [430, 320], Qt.Horizontal)
+        self._wire_moment_panel()
 
         self.selection_label = QLabel("")
         self.statusBar().addPermanentWidget(self.selection_label)
         self._build_actions()
+        self._load_arrow_settings()
         self.statusBar().showMessage(f"Appearance: {self.appearance.source}")
 
     # -- UI construction ----------------------------------------------------------
@@ -109,9 +192,13 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
         file_menu = mb.addMenu("&File")
         open_act = QAction("&Open...", self, shortcut=QKeySequence.Open, triggered=self.open_dialog)
+        self.save_act = QAction("&Save session", self, shortcut=QKeySequence.Save,
+                                triggered=self.save_session)
+        save_as = QAction("Save session &as...", self, shortcut=QKeySequence.SaveAs,
+                          triggered=lambda: self.save_session(ask=True))
         shot_act = QAction("Save &image...", self, triggered=self.save_image_dialog)
         quit_act = QAction("&Quit", self, shortcut=QKeySequence.Quit, triggered=self.close)
-        file_menu.addActions([open_act, shot_act])
+        file_menu.addActions([open_act, self.save_act, save_as, shot_act])
         file_menu.addSeparator()
         file_menu.addAction(quit_act)
 
@@ -125,19 +212,25 @@ class MainWindow(QMainWindow):
         edit.addSeparator()
         edit.addAction(QAction("Select all &magnetic sites", self, shortcut=QKeySequence.SelectAll,
                                triggered=self.select_all_magnetic))
-        edit.addAction(QAction("Select &equivalent sites", self, shortcut="E",
-                               triggered=self.select_equivalent))
+        edit.addAction(QAction("Select &equivalent sites  (E)", self, triggered=self.select_equivalent))
+        edit.addAction(QAction("&Box select  (B, or long-press)", self, triggered=self._arm_box))
+        edit.addSeparator()
+        edit.addAction(QAction("&Flip moments  (F)", self, triggered=self.flip_selection))
+        edit.addAction(QAction("&Zero moments  (0)", self, triggered=self.zero_selection))
+        edit.addAction(QAction("&Patterns...  (P)", self, triggered=self.show_patterns_menu))
         edit.addAction(QAction("&Clear magnetic sites", self, triggered=self._clear_magnetic))
-        # Gesture keys go to the state machine (Esc cancels/clears, B arms box select).
         self.addAction(QAction("Cancel", self, shortcut=Qt.Key_Escape,
                                triggered=lambda: self.editor.key("escape")))
-        self.addAction(QAction("Box select", self, shortcut="B",
-                               triggered=lambda: self._arm_box()))
 
         view_menu = mb.addMenu("&View")
         tb = self.addToolBar("View")
         tb.setObjectName("view_toolbar")
         tb.addAction(open_act)
+        tb.addSeparator()
+        self.moment_mode_act = QAction("Moments (M)", self, checkable=True,
+                                       triggered=lambda on: self.set_mode(ia.Mode.MOMENT if on else ia.Mode.VIEW))
+        self.moment_mode_act.setToolTip("Moment-edit mode: drag from an atom to set its moment")
+        tb.addAction(self.moment_mode_act)
         tb.addSeparator()
         for view in VIEWS:
             label = "3D" if view == "oblique" else view
@@ -159,36 +252,80 @@ class MainWindow(QMainWindow):
                                           triggered=lambda _=False, p=preset: self.resize_canvas(p)))
         canvas_menu.addAction(QAction("Custom...", self, triggered=self._custom_canvas))
 
-    # -- loading ----------------------------------------------------------------
+    def _wire_moment_panel(self) -> None:
+        p = self.moments_panel
+        p.apply_vector.connect(lambda v: self._edit(lambda s: self.doc.set_moments(s, v, "Set moment")))
+        p.apply_signed.connect(lambda x: self._edit(
+            lambda s: self.doc.set_moments(s, x * mg.unit(self.doc.spin_axis), "Set moment")))
+        p.apply_magnitude.connect(lambda x: self._edit(lambda s: self.doc.set_magnitude(s, x)))
+        p.fm.connect(lambda sign: self._edit(lambda s: self.doc.apply_signs(
+            s, np.full(len(s), sign), "FM up" if sign > 0 else "FM down")))
+        p.flip.connect(self.flip_selection)
+        p.zero.connect(self.zero_selection)
+        p.patterns.connect(self.show_patterns_menu)
+        p.collinear_toggled.connect(self._set_collinear)
+        p.spin_axis_changed.connect(self._set_spin_axis)
+        p.arrows_changed.connect(self._arrows_changed)
+        p.auto_fit.connect(self.auto_fit_arrows)
+
+    # -- loading / saving -----------------------------------------------------------
     def open_dialog(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open structure", "", FILE_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, "Open structure or session", "", FILE_FILTER)
         if path:
             self.load_file(path)
 
     def load_file(self, path: str | Path) -> bool:
+        path = Path(path)
         try:
+            if path.name.endswith(".magview.json"):
+                self.set_document(project.load(path), session_path=path)
+                return True
             crystal = CrystalStructure.from_file(path)
-        except StructureLoadError as exc:
-            QMessageBox.critical(self, "Cannot open structure", str(exc))
+        except (StructureLoadError, project.ProjectError) as exc:
+            QMessageBox.critical(self, "Cannot open", str(exc))
             return False
-        self.set_crystal(crystal)
+        self.set_document(MagDocument.new(crystal))
         return True
 
     def set_crystal(self, crystal: CrystalStructure) -> None:
-        self.doc = MagDocument.new(crystal)
-        self.doc.history.subscribe(self._on_history)
+        self.set_document(MagDocument.new(crystal))
+
+    def set_document(self, doc: MagDocument, session_path: Path | None = None) -> None:
+        self.doc = doc
+        self.session_path = session_path
+        doc.history.subscribe(self._on_history)
+        crystal = doc.crystal
         self.selection = frozenset()
         self.ref_scene.set_model(build_scene_model(crystal, self.appearance, show_bonds=False))
         self.ref_scene.set_view("oblique")
+        self._sync_model_ui()
         self._rebuild_main(reset_camera=True)
         self.suggestions.set_report(self.suggester.suggest(crystal))
-        self.setWindowTitle(f"MagView {__version__} - {crystal.name}")
+        self.setWindowTitle(f"MagView {__version__} - {session_path.name if session_path else crystal.name}")
         self.info.setText(crystal.summary().replace("  ", "\n"))
-        self.statusBar().showMessage(f"Loaded {crystal.source or crystal.formula}; "
-                                     f"canvas {self.doc.canvas.describe()}")
+        self.statusBar().showMessage(f"Loaded {session_path or crystal.source or crystal.formula}; "
+                                     f"canvas {doc.canvas.describe()}")
         self._update_actions()
+        self._refresh_moment_panel()
         self.reference.render()
 
+    def save_session(self, ask: bool = False) -> bool:
+        if self.doc is None:
+            return False
+        path = self.session_path
+        if ask or path is None:
+            default = f"{self.doc.crystal.name}.magview.json"
+            name, _ = QFileDialog.getSaveFileName(self, "Save session", default,
+                                                  "MagView session (*.magview.json)")
+            if not name:
+                return False
+            path = Path(name if name.endswith(".magview.json") else name + ".magview.json")
+        project.save(self.doc, path)
+        self.session_path = path
+        self.statusBar().showMessage(f"Saved {path}")
+        return True
+
+    # -- main view ------------------------------------------------------------------
     def _rebuild_main(self, reset_camera: bool = False) -> None:
         doc = self.doc
         grid = subcell_edges(doc.crystal.lattice_matrix, doc.canvas.matrix)
@@ -196,9 +333,13 @@ class MainWindow(QMainWindow):
         model = build_scene_model(doc.canvas.structure, self.appearance,
                                   site_moments=doc.moments if has_moments else None,
                                   moment_view=self.moment_view, grid_edges=grid)
+        self.scene.spin_axis = doc.spin_axis.copy()
         self.scene.set_model(model, reset_camera=reset_camera)
         self._refresh_selection()
         self.viewport.render()
+
+    def _display_moments(self, canvas_moments: np.ndarray) -> np.ndarray:
+        return canvas_moments[self.scene.model.atoms.parent]
 
     # -- selection ----------------------------------------------------------------
     def _on_select(self, sites: list[int], op: ia.SelectOp) -> None:
@@ -210,6 +351,7 @@ class MainWindow(QMainWindow):
     def set_selection(self, sites) -> None:
         self.selection = frozenset(int(s) for s in sites)
         self._refresh_selection()
+        self._refresh_moment_panel()
         self.viewport.render()
         self.reference.render()
 
@@ -224,6 +366,13 @@ class MainWindow(QMainWindow):
             self.ref_scene.set_selection(np.nonzero(np.isin(self.ref_scene.model.atoms.parent, inputs))[0])
         n = len(self.selection)
         self.selection_label.setText(f"{n} site{'s' if n != 1 else ''} selected" if n else "")
+
+    def _refresh_moment_panel(self) -> None:
+        if self.doc is None:
+            return
+        sel = np.array(sorted(self.selection), dtype=int)
+        self.moments_panel.set_selection(self.doc.moments[sel], self.doc.crystal.lattice_matrix,
+                                         self.doc.collinear, self.doc.spin_axis)
 
     def _on_info(self, site: int | None) -> None:
         if site is None or self.doc is None:
@@ -251,13 +400,273 @@ class MainWindow(QMainWindow):
         self.editor.key("b")
         self.statusBar().showMessage("Box select armed: drag a rectangle")
 
+    # -- modes ------------------------------------------------------------------------
+    def set_mode(self, mode: ia.Mode) -> None:
+        self.editor.set_mode(mode)
+
+    def toggle_moment_mode(self) -> None:
+        self.set_mode(ia.Mode.VIEW if self.editor.machine.mode == ia.Mode.MOMENT else ia.Mode.MOMENT)
+
     def _on_mode_changed(self, mode: ia.Mode) -> None:
+        self.moment_mode_act.setChecked(mode == ia.Mode.MOMENT)
+        if mode == ia.Mode.MOMENT:
+            self._moment_view_before_mode = self.moment_view
+            self.moment_view_act.setChecked(True)
+            self.mom_dock.raise_()
+        else:
+            self.moment_view_act.setChecked(self._moment_view_before_mode)
         self.statusBar().showMessage(f"Mode: {mode.value}")
+
+    # -- moment drag ------------------------------------------------------------------
+    def _on_drag(self, action) -> None:
+        if self.doc is None:
+            return
+        if isinstance(action, ia.DragStart):
+            site = action.site
+            if site not in self.selection:
+                self.set_selection({site})
+            targets = np.array(sorted(self.selection), dtype=int)
+            idx = self.editor.press_display_index
+            model = self.scene.model
+            anchor = model.atoms.cart[idx] if idx is not None else \
+                self.doc.canvas.structure.cart_coords[site]
+            cam = self.viewport.camera
+            view_dir = mg.unit(np.array(cam.focal_point) - np.array(cam.position))
+            up = np.array(cam.up, dtype=float)
+            up = mg.unit(up - (up @ view_dir) * view_dir)
+            frame = mg.DragFrame(anchor, view_dir, up, self.scene.arrow_style.scale,
+                                 self.doc.canvas.structure.lattice_matrix,
+                                 centered=self.scene.arrow_style.centered)
+            self._drag = DragState(frame, targets, self.doc.moments.copy())
+        elif isinstance(action, ia.DragUpdate):
+            if self._drag is not None:
+                self._drag_pos = (action.x, action.y, action.mods)
+                self._refresh_drag()
+        elif isinstance(action, ia.DragCommit):
+            drag, self._drag = self._drag, None
+            self.cursor_label.hide()
+            if drag is None or drag.result is None or drag.result.below_dead_zone:
+                self.scene.update_moments(self._display_moments(self.doc.moments))
+                self.viewport.render()
+                return
+            n = len(drag.targets)
+            self.doc.set_moments(drag.targets, drag.result.moment,
+                                 f"Drag moment ({n} site{'s' if n > 1 else ''})")
+        elif isinstance(action, ia.DragCancel):
+            self._drag = None
+            self.cursor_label.hide()
+            self.scene.update_moments(self._display_moments(self.doc.moments))
+            self.viewport.render()
+
+    def _refresh_drag(self) -> None:
+        drag = self._drag
+        if drag is None or self._drag_pos is None:
+            return
+        x, y, mods = self._drag_pos
+        o, d = display_ray(self.viewport.renderer, x, y)
+        p = mg.plane_point(drag.frame, o, d)
+        axis = self.doc.spin_axis if self.doc.collinear else None
+        res = mg.drag_moment(drag.frame, p, lock=self.axis_lock, snap=mods.shift, collinear_axis=axis)
+        drag.result = res
+        preview = drag.original.copy()
+        if not res.below_dead_zone:
+            preview[drag.targets] = mg.project_collinear(res.moment, axis) if axis is not None else res.moment
+        self.scene.update_moments(self._display_moments(preview))
+        m = res.moment
+        r, th, ph = mg.spherical(m)
+        abc = mg.crystal_components(m, self.doc.crystal.lattice_matrix)
+        # Note: VTK's text renderer treats '|' specially, so no "|m|" here.
+        lines = [f"m = {r:.2f} muB" + ("  (below 0.2: no change)" if res.below_dead_zone else ""),
+                 f"xyz ({m[0]:+.2f}, {m[1]:+.2f}, {m[2]:+.2f})",
+                 f"abc ({abc[0]:+.2f}, {abc[1]:+.2f}, {abc[2]:+.2f})",
+                 f"theta {th:5.1f}  phi {ph:5.1f}"]
+        lock = res.lock or ("snap" if mods.shift else None)
+        if lock:
+            lines.append(f"lock: {lock}" + (" + snap" if mods.shift and res.lock else ""))
+        if res.note:
+            lines.append(res.note)
+        if len(drag.targets) > 1:
+            lines.append(f"applies to {len(drag.targets)} selected sites")
+        self.cursor_label.show("\n".join(lines), x, y)
+        self.viewport.render()
+
+    # -- batch edits ------------------------------------------------------------------
+    def _edit(self, fn) -> None:
+        if self.doc is None or not self.selection:
+            self.statusBar().showMessage("Select atoms first")
+            return
+        fn(np.array(sorted(self.selection), dtype=int))
+
+    def flip_selection(self) -> None:
+        self._edit(self.doc.flip if self.doc else None)
+
+    def zero_selection(self) -> None:
+        self._edit(self.doc.zero if self.doc else None)
+
+    def pattern_options(self) -> list[PatternOption]:
+        sites = np.array(sorted(self.selection), dtype=int)
+        return pattern_options(self.doc.canvas.structure, sites, self.doc.crystal.lattice_matrix)
+
+    def apply_pattern(self, key: str) -> bool:
+        """Apply the pattern option ``key`` to the selection (one undo step)."""
+        opts = {o.key: o for o in self.pattern_options()}
+        opt = opts.get(key)
+        if opt is None or not opt.available:
+            return False
+        sites = np.array(sorted(self.selection), dtype=int)
+        self.doc.apply_signs(sites, opt.signs, f"Pattern: {opt.label}")
+        return True
+
+    def build_patterns_menu(self) -> QMenu:
+        menu = QMenu(self)
+        menu.setToolTipsVisible(True)
+        menu.addSection(f"Patterns for {len(self.selection)} selected sites")
+        for opt in self.pattern_options():
+            act = menu.addAction(opt.label if opt.available else f"{opt.label}  (n/a)")
+            act.setData(opt.key)
+            act.setEnabled(opt.available)
+            act.setToolTip(opt.reason)
+        menu.hovered.connect(self._preview_pattern)
+        return menu
+
+    def show_patterns_menu(self) -> None:
+        if self.doc is None or not self.selection:
+            self.statusBar().showMessage("Select atoms first (click, or long-press and drag)")
+            return
+        menu = self.build_patterns_menu()
+        chosen = menu.exec(QCursor.pos())
+        self._end_preview()
+        if chosen is not None and chosen.data():
+            self.apply_pattern(chosen.data())
+
+    def _preview_pattern(self, action) -> None:
+        key = action.data()
+        opt = next((o for o in self.pattern_options() if o.key == key), None)
+        if opt is None or not opt.available:
+            self._end_preview()
+            return
+        sites = np.array(sorted(self.selection), dtype=int)
+        preview = self.doc.moments.copy()
+        preview[sites] = np.outer(self.doc.magnitude_for(sites) * opt.signs, mg.unit(self.doc.spin_axis))
+        self.scene.update_moments(self._display_moments(preview))
+        self.viewport.render()
+
+    def _end_preview(self) -> None:
+        if self.doc is not None and self.scene.model is not None:
+            moments = self._display_moments(self.doc.moments)
+            if np.any(moments):
+                self.scene.update_moments(moments)
+            else:
+                self.scene.set_moments(None)
+            self.viewport.render()
+
+    def _context_menu(self, site: int | None) -> None:
+        if self.doc is None:
+            return
+        if site is not None and site not in self.selection:
+            self.set_selection({site})
+        menu = QMenu(self)
+        if self.selection:
+            menu.addAction("Flip  (F)", self.flip_selection)
+            menu.addAction("Zero  (0)", self.zero_selection)
+            menu.addAction("Set |m|...", self._ask_magnitude)
+            menu.addAction("Patterns...  (P)", self.show_patterns_menu)
+            menu.addSeparator()
+            menu.addAction("Select equivalent  (E)", self.select_equivalent)
+        menu.addAction("Select all magnetic  (Ctrl+A)", self.select_all_magnetic)
+        menu.exec(QCursor.pos())
+
+    def _ask_magnitude(self) -> None:
+        val, ok = QInputDialog.getDouble(self, "Set |m|", "|m| (muB):", 1.0, 0.0, mg.MAX_MOMENT, 2)
+        if ok:
+            self._edit(lambda s: self.doc.set_magnitude(s, val))
+
+    # -- model settings -------------------------------------------------------------------
+    def _set_collinear(self, on: bool) -> None:
+        if self.doc is None or on == self.doc.collinear:
+            return
+        try:
+            self.doc.set_collinear(on)
+        except NonCollinearError:
+            ans = QMessageBox.question(
+                self, "Switch to collinear",
+                "Some moments are not along the spin axis.\nProject them onto the axis? "
+                "(Undo restores them.)", QMessageBox.Yes | QMessageBox.Cancel)
+            if ans == QMessageBox.Yes:
+                self.doc.set_collinear(True, project=True)
+        self._sync_model_ui()
+
+    def _set_spin_axis(self, name: str) -> None:
+        if self.doc is None:
+            return
+        u = mg.axis_vector(name, self.doc.crystal.lattice_matrix)
+        if not np.allclose(u, self.doc.spin_axis):
+            self.doc.set_spin_axis(u)
+
+    def _sync_model_ui(self) -> None:
+        p = self.moments_panel
+        if self.doc is None:
+            return
+        p.collinear.blockSignals(True)
+        p.collinear.setChecked(self.doc.collinear)
+        p.collinear.blockSignals(False)
+        p.set_collinear_ui(self.doc.collinear)
+        lat = self.doc.crystal.lattice_matrix
+        for i in range(p.axis.count()):
+            if np.allclose(mg.axis_vector(p.axis.itemText(i), lat), self.doc.spin_axis):
+                p.axis.blockSignals(True)
+                p.axis.setCurrentIndex(i)
+                p.axis.blockSignals(False)
+                break
+
+    def _arrows_changed(self) -> None:
+        p = self.moments_panel
+        self.scene.arrow_style = ArrowStyle(
+            scale=p.scale.value(), shaft_radius=self.appearance.theme.arrow_shaft_radius,
+            head_radius_ratio=self.appearance.theme.arrow_head_radius_ratio,
+            head_length_ratio=self.appearance.theme.arrow_head_length_ratio,
+            centered=p.anchor.currentIndex() == 0, resolution=self.appearance.theme.arrow_resolution)
+        self.scene.color_mode = p.color_mode.currentText()
+        self.settings.setValue("arrows/scale", p.scale.value())
+        self.settings.setValue("arrows/anchor", p.anchor.currentIndex())
+        self.settings.setValue("arrows/color_mode", p.color_mode.currentText())
+        if self.doc is not None and self.scene.model is not None:
+            self._end_preview()
+
+    def _load_arrow_settings(self) -> None:
+        p = self.moments_panel
+        for w, key, conv in ((p.scale, "arrows/scale", float), (p.anchor, "arrows/anchor", int)):
+            val = self.settings.value(key)
+            if val is not None:
+                w.blockSignals(True)
+                (w.setValue if hasattr(w, "setValue") else w.setCurrentIndex)(conv(val))
+                w.blockSignals(False)
+        mode = self.settings.value("arrows/color_mode")
+        if mode:
+            p.color_mode.blockSignals(True)
+            p.color_mode.setCurrentText(str(mode))
+            p.color_mode.blockSignals(False)
+        self._arrows_changed()
+
+    def auto_fit_arrows(self) -> None:
+        """Scale so the longest arrow spans 80% of the shortest magnetic-magnetic distance."""
+        if self.doc is None:
+            return
+        mags = np.linalg.norm(self.doc.moments, axis=1)
+        sites = np.nonzero(mags > 0)[0]
+        if len(sites) < 1:
+            return
+        g = neighbor_graph(self.doc.canvas.structure.lattice_matrix,
+                           self.doc.canvas.structure.frac_coords, sites)
+        if g.d_nn <= 0:
+            return
+        self.moments_panel.scale.setValue(round(0.8 * g.d_nn / mags.max(), 2))
 
     # -- edits ----------------------------------------------------------------------
     def _accept_suggestions(self, items, magnitudes) -> None:
         if self.doc is not None:
             self.doc.accept_suggestions(items, magnitudes)
+            self.mom_dock.raise_()
 
     def _clear_magnetic(self) -> None:
         if self.doc is not None:
@@ -302,8 +711,15 @@ class MainWindow(QMainWindow):
         # Canvas may have changed: drop selections that no longer exist.
         n = len(self.doc.canvas)
         self.selection = frozenset(s for s in self.selection if s < n)
+        self._sync_model_ui()
         self._rebuild_main(reset_camera=False)
+        self._refresh_moment_panel()
         self._update_actions()
+        if self.autosave_enabled:
+            try:
+                project.autosave(self.doc)
+            except OSError as exc:
+                self.statusBar().showMessage(f"Autosave failed: {exc}")
 
     def _update_actions(self) -> None:
         h = self.doc.history if self.doc else None

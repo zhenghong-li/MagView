@@ -114,3 +114,41 @@ def arrow_colors(moments: np.ndarray, axis: np.ndarray, up_rgb, down_rgb, neutra
     out[proj > tol] = up_rgb
     out[proj < -tol] = down_rgb
     return out
+
+
+COLOR_MODES = ("sign", "direction", "element", "uniform")
+
+
+def direction_colors(moments: np.ndarray, axis: np.ndarray) -> np.ndarray:
+    """Hue = azimuth around the spin axis, lightness = polar angle (up light, down dark)."""
+    import colorsys
+
+    m = np.asarray(moments, dtype=float)
+    u = np.asarray(axis, float) / np.linalg.norm(axis)
+    helper = np.array([1.0, 0, 0]) if abs(u[0]) < 0.9 else np.array([0, 1.0, 0])
+    e1 = np.cross(u, helper)
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(u, e1)
+    out = np.zeros((len(m), 3))
+    for k, v in enumerate(m):
+        n = np.linalg.norm(v)
+        if n == 0:
+            continue
+        v = v / n
+        hue = (np.arctan2(v @ e2, v @ e1) / (2 * np.pi)) % 1.0
+        light = 0.5 + 0.3 * (v @ u)
+        sat = 0.35 + 0.6 * np.sqrt(max(0.0, 1 - (v @ u) ** 2))
+        out[k] = colorsys.hls_to_rgb(hue, light, sat)
+    return out
+
+
+def moment_colors(mode: str, moments: np.ndarray, axis: np.ndarray, theme,
+                  atom_rgb: np.ndarray | None = None) -> np.ndarray:
+    if mode == "sign":
+        return arrow_colors(moments, axis, theme.spin_up_color, theme.spin_down_color,
+                            theme.arrow_neutral_color)
+    if mode == "direction":
+        return direction_colors(moments, axis)
+    if mode == "element" and atom_rgb is not None:
+        return np.asarray(atom_rgb, float) * 0.75
+    return np.tile(np.asarray(theme.arrow_neutral_color, float), (len(moments), 1))

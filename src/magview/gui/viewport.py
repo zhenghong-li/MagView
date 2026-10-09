@@ -33,6 +33,7 @@ class ViewportCallbacks:
     info: Callable[[int | None], None]
     mode_changed: Callable[[ia.Mode], None] = lambda mode: None
     drag: Callable[[object], None] = lambda action: None  # DragStart/Update/Commit/Cancel
+    context_menu: Callable[[int | None], None] = lambda site: None  # right click (no drag)
 
 
 class EditorInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
@@ -45,6 +46,9 @@ class EditorInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         self.AddObserver("LeftButtonPressEvent", self._on_press)
         self.AddObserver("LeftButtonReleaseEvent", self._on_release)
         self.AddObserver("MouseMoveEvent", self._on_move)
+        self.AddObserver("RightButtonPressEvent", self._on_right_press)
+        self.AddObserver("RightButtonReleaseEvent", self._on_right_release)
+        self._right_press: tuple[int, int] | None = None
         # Swallow VTK's built-in key bindings (e = exit, w = wireframe, ...).
         self.AddObserver("CharEvent", lambda *_: None)
         self.AddObserver("KeyPressEvent", lambda *_: None)
@@ -63,6 +67,20 @@ class EditorInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
     def _on_release(self, *_):
         x, y = self._pos()
         self.viewport.release(x, y, self._mods())
+
+    def _on_right_press(self, *_):
+        self._right_press = self._pos()
+        self.OnRightButtonDown()  # right drag keeps VTK's dolly (zoom)
+
+    def _on_right_release(self, *_):
+        self.OnRightButtonUp()
+        if self._right_press is None:
+            return
+        x0, y0 = self._right_press
+        x, y = self._pos()
+        self._right_press = None
+        if abs(x - x0) + abs(y - y0) < ia.CLICK_SLOP:
+            self.viewport.cb.context_menu(self.viewport.pick(x, y))
 
     def _on_move(self, *_):
         x, y = self._pos()
@@ -88,6 +106,8 @@ class EditorViewport:
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.tick)
         self._camera_down = False
+        self._last_display_pick: int | None = None
+        self.press_display_index: int | None = None  # displayed atom under the last press
 
     # -- event entry points ---------------------------------------------------------
     @staticmethod
@@ -96,6 +116,7 @@ class EditorViewport:
 
     def press(self, x: float, y: float, mods: ia.Mods) -> None:
         hit = self.pick(x, y)
+        self.press_display_index = self._last_display_pick
         self._run(self.machine.handle(ia.Press(x, y, self.now(), hit, mods)))
         if self.machine.state == ia.GestureState.PRESSED:
             self._timer.start(int(ia.LONG_PRESS_S * 1000) + 15)
@@ -120,10 +141,13 @@ class EditorViewport:
 
     # -- helpers ----------------------------------------------------------------------
     def pick(self, x: float, y: float) -> int | None:
+        """Canvas site under display pixel (x, y); remembers the displayed atom too."""
         model = self.scene.model
+        self._last_display_pick = None
         if model is None:
             return None
         i = pick_atom(self.plotter.renderer, model, x, y)
+        self._last_display_pick = i
         return None if i is None else int(model.atoms.parent[i])
 
     def sites_in_box(self, x0, y0, x1, y1) -> list[int]:

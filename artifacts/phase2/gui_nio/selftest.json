@@ -1,0 +1,147 @@
+[
+  {
+    "step": "click selects one site",
+    "ok": true,
+    "detail": "site 56"
+  },
+  {
+    "step": "shift-click adds",
+    "ok": true,
+    "detail": "[39, 56]"
+  },
+  {
+    "step": "drag rotates camera",
+    "ok": true,
+    "detail": "camera moved 49.127"
+  },
+  {
+    "step": "long-press arms box",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "box selects sites inside",
+    "ok": true,
+    "detail": "48 selected, 48 expected"
+  },
+  {
+    "step": "Esc clears selection",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "accept sets edited moments",
+    "ok": true,
+    "detail": "Ni0 (4a): |m| = [np.float64(1.7)]"
+  },
+  {
+    "step": "Ctrl+Z undoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+Y redoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "canvas 2x2x2 -> 1x1x1",
+    "ok": true,
+    "detail": "8 sites"
+  },
+  {
+    "step": "undo canvas resize",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+A selects magnetic sites",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "M enters moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag up sets +axis moment",
+    "ok": true,
+    "detail": "m = [0.0, 0.0, 3.34]"
+  },
+  {
+    "step": "drag is one undo step",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag down sets -axis moment",
+    "ok": true,
+    "detail": "m = [-0.0, -0.0, -3.34]"
+  },
+  {
+    "step": "Esc cancels a drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "dead zone: tiny drag changes nothing",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "non-collinear drag with X lock",
+    "ok": true,
+    "detail": "m = [-6.937, -0.0, -0.0]"
+  },
+  {
+    "step": "free non-collinear drag follows the cursor",
+    "ok": true,
+    "detail": "|m| = 3.24"
+  },
+  {
+    "step": "projected back to collinear",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "F flips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "0 zeroes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "drag on a selected atom sets the whole selection",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "patterns menu built",
+    "ok": true,
+    "detail": "9 entries"
+  },
+  {
+    "step": "apply pattern A-type along c",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "session save/load round trip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "autosave written after edits",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Esc exits moment mode",
+    "ok": true,
+    "detail": ""
+  }
+]

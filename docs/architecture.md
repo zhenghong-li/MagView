@@ -47,8 +47,8 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `core/canvas.py` ✓ | 1 | editing canvas W × input cell; site ↔ (parent, R) |
 | `core/interaction.py` ✓, `core/history.py` ✓, `core/document.py` ✓, `core/selection.py` ✓ | 1 | gesture state machine; undo/redo |
 | `core/suggest.py` ✓ | 1 | magnetic-site suggestion (rule-based) |
-| `core/magnetic.py`, `core/batch.py`, `core/project.py` | 2 | moment model, batch patterns, save/load |
-| `core/layers.py`, `core/lattice2d.py`, `core/patterns.py` | 3 | layers, 2D lattice classification, matcher |
+| `core/magnetic.py` ✓, `core/batch.py` ✓, `core/project.py` ✓, `core/graph.py` ✓ | 2 | drag math, batch patterns, save/load, neighbour graphs + sign propagation |
+| `core/lattice2d.py` ✓ (Phase 2), `core/layers.py`, `core/patterns.py` | 3 | 2D lattice classification + pattern library; layers; matcher |
 | `core/stacking.py` | 4 | inter-layer stacking and its matcher |
 | `core/magcell.py` | 5 | minimal magnetic supercell + explanation |
 | `style/vesta_ini.py` ✓, `style/elements.py` ✓, `style/theme.py` ✓, `style/appearance.py` ✓ | 0 | appearance |
@@ -56,7 +56,7 @@ file --CrystalStructure.from_file--> CrystalStructure (input cell, frac in [0,1)
 | `render/picking.py` ✓, `render/overlay.py` ✓ | 1 | pick → site, rubber-band projection |
 | `io/handoff.py`, `bridge/agentdft.py` | 5 | handoff JSON + schema; mock AgentDFT bridge |
 | `gui/main_window.py` ✓, `gui/app.py` ✓ | 0 | shell: main view, reference view, open, view buttons |
-| `gui/viewport.py` ✓, `gui/panels/suggestion_panel.py` ✓, `gui/selftest.py` ✓, other panels | 1–5 | interaction wiring, side panels |
+| `gui/viewport.py` ✓, `gui/panels/suggestion_panel.py` ✓, `gui/panels/moment_panel.py` ✓, `gui/selftest.py` ✓, other panels | 1–5 | interaction wiring, side panels |
 
 ## Interaction path (Phase 1)
 
@@ -67,6 +67,10 @@ Qt mouse event -> QVTKRenderWindowInteractor -> EditorInteractorStyle (VTK obser
       BoxArmed/Update/Finish (render.overlay + render.picking), Drag* (Phase 2)
 ```
 The long-press timer is a Qt single-shot timer that injects `Tick` events. Tests inject the same events directly. `magview.gui.selftest` drives the whole path with QtTest under Xvfb.
+
+## Pattern engine (Phase 2, reused by Phases 3–4)
+
+A collinear pattern is a sign (+1 FM / −1 AFM) per nearest-neighbour bond. `core.graph.neighbor_graph` builds the periodic nearest-neighbour graph of any set of canvas sites; bonds to images, including a site's own image, are kept. `propagate` turns bond signs into site signs by BFS and lists every contradicting bond, so frustration and "canvas too small" are detected exactly. `core.lattice2d` classifies planar nets (square/rectangular, honeycomb, triangular) by coordination and bond-direction classes, and defines the canonical library as per-class signs.
 
 ## Rendering notes
 - **Atoms:** one glyph actor per opacity level, with sphere radius = VESTA atomic radius × `ball_scale`.

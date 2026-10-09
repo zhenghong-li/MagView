@@ -7,7 +7,7 @@ MagView is a real-time crystal-structure editor modeled on VESTA, with an intera
 3. You choose how the layers stack.
 4. It finds the minimal magnetic supercell and writes a JSON handoff for an AgentDFT backend.
 
-MagView is built in phases; see `docs/reports/`. **Status: Phase 1 done**: structure loading, VESTA-like rendering, editing canvas, picking and selection (click and long-press box), undo/redo, and magnetic-site suggestions.
+MagView is built in phases; see `docs/reports/`. **Status: Phase 2 done**: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, **moment editing** (drag, axis locks, snapping, batch operations, FM/AFM pattern popover) and session files.
 
 ## Setup (Ubuntu 24.04 container or WSL)
 
@@ -30,10 +30,18 @@ On Windows or macOS hosts no system packages are needed; just create the venv an
 .venv/bin/python -m magview FILE.cif --render out.png --view c     # offscreen PNG, no display needed
 .venv/bin/python scripts/render_gallery.py                         # regenerate artifacts/phase0/
 .venv/bin/python scripts/phase1_artifacts.py                       # regenerate artifacts/phase1/
+.venv/bin/python scripts/phase2_artifacts.py                       # regenerate artifacts/phase2/
 xvfb-run -a .venv/bin/python -m magview.gui.selftest FILE.cif --out DIR   # scripted GUI test
 ```
 
 Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel zooms. Click selects; Shift-click adds, Ctrl-click toggles. **Long-press (0.35 s) then drag** draws a rubber band (or press `B`, then drag). `Esc` cancels or clears, `Ctrl+A` selects all magnetic sites, `E` selects equivalent sites, and `Ctrl+Z` / `Ctrl+Y` undo and redo.
+
+**Moment mode** (`M` or the toolbar):
+- Drag from an atom to set its moment; the arrow tip follows the cursor. Hold `X`/`Y`/`Z`/`A`/`B`/`C` to lock to an axis, and `Shift` to snap.
+- Dragging a selected atom sets the whole selection.
+- `F` flips, `0` zeroes, `P` opens the Patterns menu (FM, Néel, stripe, zigzag, A/C/G-type).
+- A right-click opens the context menu.
+- `Ctrl+S` saves a `.magview.json` session; a recovery autosave runs after every edit.
 
 Views: `oblique` (default), `a`, `b`, `c`, `a*`, `b*`, `c*`.
 

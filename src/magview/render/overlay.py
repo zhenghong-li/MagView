@@ -125,3 +125,34 @@ class ModeOverlay:
         self._shown = None
         self.border.VisibilityOff()
         self.banner.VisibilityOff()
+
+
+class CursorLabel:
+    """Small multi-line readout next to the cursor (live drag feedback)."""
+
+    def __init__(self, renderer) -> None:
+        self.renderer = renderer
+        self.actor = vtk.vtkTextActor()
+        tp = self.actor.GetTextProperty()
+        tp.SetFontSize(14)
+        tp.SetColor(0.1, 0.1, 0.1)
+        tp.SetBackgroundColor(1.0, 1.0, 0.9)
+        tp.SetBackgroundOpacity(0.9)
+        tp.SetFrame(True)
+        tp.SetFrameColor(0.4, 0.4, 0.4)
+        tp.SetFontFamilyToCourier()
+        self.actor.VisibilityOff()
+        renderer.AddViewProp(self.actor)
+
+    def show(self, text: str, x: float, y: float) -> None:
+        self.actor.SetInput(text)
+        w, h = self.renderer.GetSize()
+        lines = text.count("\n") + 1
+        width = 9 * max(len(s) for s in text.splitlines())
+        px = min(max(4, x + 18), max(4, w - width - 4))
+        py = min(max(4, y - 18 - 17 * lines), h - 17 * lines - 4)
+        self.actor.SetDisplayPosition(int(px), int(py))
+        self.actor.VisibilityOn()
+
+    def hide(self) -> None:
+        self.actor.VisibilityOff()

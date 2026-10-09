@@ -66,6 +66,7 @@ class RenderTheme:
     # Moment view: shrink atoms so arrows stay visible, fade non-magnetic atoms, hide bonds.
     moment_view_atom_scale: float = 0.6
     moment_view_nonmagnetic_opacity: float = 0.25
+    moment_view_desaturate: float = 0.55  # blend atom colors toward light gray so arrows stand out
 
     # --- interaction feedback (MagView) ---
     selection_color: RGB = (1.0, 0.85, 0.0)

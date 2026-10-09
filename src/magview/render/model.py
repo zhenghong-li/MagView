@@ -116,6 +116,8 @@ def build_scene_model(crystal: CrystalStructure, appearance: Appearance,
     opacity = None
     if moment_view:
         radius = radius * theme.moment_view_atom_scale
+        k = theme.moment_view_desaturate
+        rgb = (1 - k) * rgb + k * 0.82
         has_moment = (np.linalg.norm(moments, axis=1) > 0 if moments is not None
                       else np.zeros(len(atoms), bool))
         opacity = np.where(has_moment, 1.0, theme.moment_view_nonmagnetic_opacity)

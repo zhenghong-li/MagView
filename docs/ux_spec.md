@@ -1,6 +1,6 @@
 # MagView moment-editing UX specification
 
-Status: **draft, approved with the Phase 0 plan**. It is frozen at the start of Phase 2, and any change after that point is recorded here with a reason. The goal is that every interaction works out of the box, without requiring a later redesign.
+Status: **frozen at Phase 2** and implemented (`core/interaction.py`, `core/magnetic.py`, `core/batch.py`, `gui/`). Changes made during implementation are recorded in §8 with their reasons. The goal is that every interaction works out of the box, without requiring a later redesign.
 
 ## 1. Modes
 
@@ -38,7 +38,7 @@ These gestures are recognized by a pure state machine (`core/interaction.py`). T
 ## 3. Drawing a moment
 
 - **Plane:** the arrow lies in the plane through the atom center, perpendicular to the view direction. The mouse ray is intersected with that plane.
-- **Direction and length:** the moment points from the atom center toward the cursor, and |m| = (distance in Å) / scale (Å per μB). The default scale comes from VESTA's `VECTS` (1.0 Å/μB).
+- **Direction and length:** the moment points from the atom center toward the cursor, and the **arrow tip stays under the cursor**: |m| = (distance in Å) / (scale × ½) for centered arrows, or / scale for tail-anchored ones. The scale is in Å per μB; the default comes from VESTA's `VECTS` (1.0 Å/μB).
 - **Dead zone:** below 0.2 μB the drag counts as a click, so no tiny accidental moments are created.
 - **Range:** |m| is clamped to [0, 10] μB (configurable) and shown in the tooltip.
 - **Constraints** apply while a key is held:
@@ -74,7 +74,7 @@ These apply to the current selection. Each one is a single undo step.
 | Magnitude labels | off | on / off |
 | Arrows on periodic images | on | on / off |
 
-**Known issue (from the Phase 0 renders):** the default spin-up red is close to VESTA's red for O and V, so in moment view a V atom and its up-arrow read as one red pin. Phase 2 resolves this with renders. The candidate fix is to desaturate atom colors in moment view, so element identity stays visible while arrows remain the most saturated objects in the scene.
+**Resolved (Phase 2):** spin-up red used to clash with VESTA's red for O and V. In moment view, atom colors are now blended 55% toward light gray, so element identity stays visible while arrows remain the most saturated objects. See `artifacts/phase2/cs3v9te13_{before,after}_fix.png`.
 
 ## 6. Data and safety rails
 
@@ -87,3 +87,15 @@ These apply to the current selection. Each one is a single undo step.
 ## 7. Keyboard summary
 
 `M` moment mode · `L` layer mode · `Esc` cancel/exit · `B` arm box select · `P` patterns · `F` flip selection · `0` zero selection · `Ctrl+A` select all magnetic sites · `Ctrl+Z`/`Ctrl+Y` undo/redo · hold `X Y Z A B C` axis lock · hold `Shift` snap.
+
+## 8. Changes made during implementation (Phase 2)
+
+| Change | Reason |
+|---|---|
+| The arrow **tip** follows the cursor (for centered arrows, \|m\| uses half the scale) | With centered arrows the tip reached only halfway to the cursor, which felt like the arrow "lagged" (visible in the first drag replay). Grabbing the tip is the natural mental model. Drag length still maps linearly to \|m\|. |
+| Moment view desaturates atom colors (55% toward light gray) | Spin-up red merged with red V/O atoms (§5). |
+| Letter keys (B, M, F, 0, P, E, and the held X/Y/Z/A/B/C locks) are handled by a key filter on the 3D viewport, not by window shortcuts | `B` is both "box select" (when idle) and "lock to b" (while dragging). Shortcuts would consume the key before the drag sees it. Ctrl combinations and Esc stay window shortcuts. |
+| Redo is bound to both Ctrl+Y and Ctrl+Shift+Z | Qt's platform-standard Redo on Linux is Ctrl+Shift+Z only. |
+| Right-click without movement opens the context menu; right-drag keeps VTK's zoom | Both behaviors are kept without a mode switch. |
+| Overlay text avoids the `\|` character | VTK's text renderer treats `\|` specially, so "\|m\| = ..." rendered garbled. |
+| Patterns popover: entries that don't apply stay visible but disabled, with the reason as a tooltip | Required by §4 ("grayed out with the reason"). |

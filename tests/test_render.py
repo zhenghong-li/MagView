@@ -150,3 +150,53 @@ def test_moment_view_arrows_render(load, appearance):
     img = render_png(c, None, view="b", size=(400, 300), site_moments=m, moment_view=True)
     red = (img[..., 0] > 150) & (img[..., 1] < 90) & (img[..., 2] < 90)
     assert red.mean() > 0.002  # spin-up arrows visible
+
+
+def test_update_moments_in_place_and_rebuild(load, appearance):
+    from magview.render.offscreen import make_plotter
+    from magview.render.scene import StructureScene
+
+    c = load("NiO")
+    m = np.zeros((len(c), 3))
+    ni = [i for i, s in enumerate(c.symbols) if s == "Ni"]
+    m[ni] = [0, 0, 2.0]
+    model = build_scene_model(c, appearance, site_moments=m, moment_view=True)
+    p = make_plotter((300, 200))
+    try:
+        scene = StructureScene(p, appearance.theme)
+        scene.set_model(model)
+        mesh = scene._arrow_mesh
+        before = np.array(mesh.points)
+        disp = model.moments.copy()
+        disp[model.moments[:, 2] > 0] *= -1  # flip all arrows: same atoms, new geometry
+        scene.update_moments(disp)
+        assert scene._arrow_mesh is mesh  # in place
+        assert not np.allclose(mesh.points, before)
+        disp[0] = 0.0 if np.any(model.moments[0]) else [0, 0, 1.0]  # arrow set changes
+        scene.update_moments(disp)
+        assert scene._arrow_mesh is not mesh  # rebuilt
+    finally:
+        p.close()
+
+
+@pytest.mark.parametrize("mode", ["sign", "direction", "element", "uniform"])
+def test_color_modes(mode, appearance):
+    from magview.render.arrows import moment_colors
+
+    m = np.array([[0, 0, 1.0], [0, 0, -1.0], [1.0, 0, 0], [0, 1.0, 0]])
+    rgb = moment_colors(mode, m, [0, 0, 1], appearance.theme, atom_rgb=np.full((4, 3), 0.5))
+    assert rgb.shape == (4, 3) and np.all((rgb >= 0) & (rgb <= 1))
+    if mode == "sign":
+        assert np.allclose(rgb[0], appearance.theme.spin_up_color)
+    if mode == "direction":
+        assert not np.allclose(rgb[2], rgb[3])  # different azimuths -> different hues
+        assert rgb[0].sum() > rgb[1].sum()  # up lighter than down
+
+
+def test_moment_view_desaturates_atoms(load, appearance):
+    c = load("Cs3V9Te13_300K")
+    plain = build_scene_model(c, appearance, show_bonds=False)
+    mv = build_scene_model(c, appearance, moment_view=True)
+    v = plain.atom_symbols.index("V")
+    sat = lambda rgb: rgb.max() - rgb.min()  # noqa: E731
+    assert sat(mv.atom_rgb[v]) < 0.6 * sat(plain.atom_rgb[v])

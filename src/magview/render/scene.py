@@ -11,7 +11,7 @@ import numpy as np
 import pyvista as pv
 import vtk
 
-from magview.render.arrows import ArrowStyle, arrow_colors, arrow_geometry
+from magview.render.arrows import ArrowStyle, arrow_geometry, moment_colors
 from magview.render.camera import fit_parallel_scale, view_basis
 from magview.render.model import SceneModel
 from magview.style.theme import RenderTheme
@@ -36,6 +36,11 @@ class StructureScene:
         self._triad: AxesTriad | None = None
         self._view = "oblique"
         self._selection = np.zeros(0, int)
+        self.arrow_style = ArrowStyle.from_theme(theme)
+        self.color_mode = "sign"
+        self.spin_axis = DEFAULT_SPIN_AXIS.copy()
+        self._arrow_mesh: pv.PolyData | None = None
+        self._arrow_rows: np.ndarray | None = None  # displayed atoms that currently have arrows
         plotter.set_background(theme.background)
         self._setup_lighting()
 
@@ -113,26 +118,50 @@ class StructureScene:
         if reset_camera:
             self.set_view(self._view)
 
-    def set_moments(self, moments: np.ndarray | None, spin_axis: np.ndarray = DEFAULT_SPIN_AXIS,
+    def set_moments(self, moments: np.ndarray | None, spin_axis: np.ndarray | None = None,
                     style: ArrowStyle | None = None) -> None:
         """(Re)draw arrows for per-displayed-atom Cartesian moments (mu_B)."""
+        if spin_axis is not None:
+            self.spin_axis = np.asarray(spin_axis, dtype=float)
+        if style is not None:
+            self.arrow_style = style
         if "arrows" in self.actors:
             self.plotter.remove_actor(self.actors.pop("arrows"), render=False)
+        self._arrow_mesh = None
+        self._arrow_rows = None
         if self.model is None or moments is None:
             return
         self.model.moments = np.asarray(moments, dtype=float)
-        style = style or ArrowStyle.from_theme(self.theme)
-        points, faces, idx = arrow_geometry(self.model.atoms.cart, self.model.moments, style)
-        if len(points) == 0:
+        mesh = self._arrow_polydata(self.model.moments)
+        if mesh is None:
             return
-        t = self.theme
-        rgb = arrow_colors(self.model.moments, spin_axis, t.spin_up_color, t.spin_down_color,
-                           t.arrow_neutral_color)
-        mesh = pv.PolyData(points, faces)
-        mesh["rgb"] = _to_uint8(rgb[idx])
-        mesh = mesh.compute_normals(split_vertices=True, feature_angle=50.0, auto_orient_normals=False)
+        self._arrow_mesh = mesh
         self.actors["arrows"] = self.plotter.add_mesh(
             mesh, scalars="rgb", rgb=True, name="arrows", **self._material())
+
+    def _arrow_polydata(self, moments: np.ndarray) -> pv.PolyData | None:
+        points, faces, idx = arrow_geometry(self.model.atoms.cart, moments, self.arrow_style)
+        if len(points) == 0:
+            return None
+        rgb = moment_colors(self.color_mode, moments, self.spin_axis, self.theme, self.model.atom_rgb)
+        mesh = pv.PolyData(points, faces)
+        mesh["rgb"] = _to_uint8(rgb[idx])
+        self._arrow_rows = np.unique(idx)
+        return mesh.compute_normals(split_vertices=True, feature_angle=50.0, auto_orient_normals=False)
+
+    def update_moments(self, moments: np.ndarray) -> None:
+        """Fast path for live dragging: rewrite the arrow mesh in place when the set of
+        atoms with arrows is unchanged; otherwise rebuild the actor."""
+        moments = np.asarray(moments, dtype=float)
+        if self.model is None:
+            return
+        rows = np.nonzero(np.linalg.norm(moments, axis=1) * self.arrow_style.scale > 1e-6)[0]
+        if self._arrow_mesh is None or self._arrow_rows is None or not np.array_equal(rows, self._arrow_rows):
+            self.set_moments(moments)
+            return
+        self.model.moments = moments
+        new = self._arrow_polydata(moments)
+        self._arrow_mesh.copy_from(new)
 
     def set_selection(self, display_indices) -> None:
         """Translucent halo around the given displayed atoms."""
