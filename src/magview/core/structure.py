@@ -46,15 +46,6 @@ class SymmetryInfo:
     primitive_lattice: np.ndarray  # (3, 3) rows = primitive lattice vectors (Angstrom)
     symprec: float
 
-    @property
-    def crystal_system(self) -> str:
-        n = self.number
-        for upper, name in ((2, "triclinic"), (15, "monoclinic"), (74, "orthorhombic"),
-                            (142, "tetragonal"), (167, "trigonal"), (194, "hexagonal")):
-            if n <= upper:
-                return name
-        return "cubic"
-
 
 @dataclass
 class CrystalStructure:

@@ -102,10 +102,6 @@ class VestaStyle:
         return int(self.blocks["BONDP"][1][0])
 
     @property
-    def bond_line_width(self) -> float:
-        return float(self.blocks["BONDP"][1][3])
-
-    @property
     def bond_rgb(self) -> tuple[int, int, int]:
         r, g, b = (int(v) for v in self.blocks["BONDP"][1][4:7])
         return (r, g, b)

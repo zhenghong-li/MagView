@@ -3,8 +3,9 @@
 Layout: the main viewport shows the editing canvas (default 2x2x2 input cells,
 light grid lines mark the input cells). The right dock holds the reference view
 (the full input cell) and structure info. The left dock has tabs for the
-magnetic-site suggestions and the Moments panel. Selection is view state; every
-edit goes through the document's undo history and triggers a recovery autosave.
+magnetic-site suggestions and the Moments, Layers and Export panels. Selection is
+view state; every edit goes through the document's undo history and schedules a
+(debounced) recovery autosave.
 """
 
 from __future__ import annotations
@@ -593,9 +594,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Restore failed", f"Could not restore {auto}:\n{exc}")
             return doc
 
-    def set_crystal(self, crystal: CrystalStructure) -> None:
-        self.set_document(MagDocument.new(crystal))
-
     def set_document(self, doc: MagDocument, session_path: Path | None = None) -> None:
         self._flush_autosave()  # the previous document's recovery file stays current
         if self.editor.machine.mode != ia.Mode.VIEW:
@@ -1094,8 +1092,6 @@ class MainWindow(QMainWindow):
             self.editor.set_mode(ia.Mode.VIEW)
         self.previewing = bool(on)
         if on:
-            from magview.core.structure import CrystalStructure
-
             self._snapshot_camera()
             crystal = CrystalStructure.from_pymatgen(as_structure(self.mag_cell))
             model = build_scene_model(crystal, self.appearance, site_moments=self.mag_cell.moments,

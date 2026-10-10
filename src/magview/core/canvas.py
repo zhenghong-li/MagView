@@ -4,8 +4,7 @@ The canvas is ``W x input cell`` for an integer matrix ``W`` (rows = canvas
 lattice vectors in units of the input lattice vectors; same convention as
 pymatgen's ``make_supercell``). Every canvas site is an input-cell site ``p``
 translated by an input-lattice vector ``R``; that ``(p, R)`` bookkeeping is what
-lets moments be carried across canvas resizes and, in Phase 5, lets the minimal
-magnetic cell be computed exactly.
+lets moments (and layer pins) be carried exactly across canvas resizes.
 
 Default ``W = diag(2, 2, 2)``: every canonical commensurate pattern has
 propagation-vector components in {0, 1/2}, so it fits.
@@ -115,9 +114,6 @@ class Canvas:
         """Canvas site index of input site ``parent`` shifted by any lattice vector."""
         r = self.reduce(translation)[0]
         return self._index[(int(parent), int(r[0]), int(r[1]), int(r[2]))]
-
-    def sites_of_parent(self, parent: int) -> np.ndarray:
-        return np.nonzero(self.parent == parent)[0]
 
     def resize_moments(self, new: "Canvas", moments: np.ndarray, tol: float = MOMENT_TOL) -> np.ndarray:
         """Carry ``moments`` (len(self), 3) onto canvas ``new`` (same input cell).

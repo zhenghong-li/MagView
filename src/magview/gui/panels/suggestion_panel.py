@@ -131,11 +131,6 @@ class SuggestionPanel(QWidget):
     def magnitudes(self) -> dict[int, float]:
         return {orbit: spin.value() for orbit, spin in self._spins.items()}
 
-    def set_checked(self, orbit: int, on: bool) -> None:
-        for row, s in enumerate(self.report.items):
-            if s.orbit == orbit and s.candidate:
-                self.table.item(row, 0).setCheckState(Qt.Checked if on else Qt.Unchecked)
-
     def _accept(self) -> None:
         items = self.checked()
         if not items:

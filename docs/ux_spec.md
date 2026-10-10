@@ -82,7 +82,7 @@ These apply to the current selection. Each one is a single undo step.
 - Switching from non-collinear to collinear with non-collinear moments present opens a dialog: project onto n̂, or cancel. Moments are never changed silently.
 - Undo/redo (`Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z`) covers every edit: drag, batch operation, pattern application, layer toggle, suggestion acceptance and canvas resize.
 - Resizing the canvas: growing it extends moments periodically. Shrinking it is refused, with an explanation, when the moments are not periodic in the smaller canvas.
-- The session saves to `.magview.json`, which holds the structure, canvas, moments and settings. A recovery autosave happens after each committed edit.
+- The session saves to `.magview.json`, which holds the structure, canvas, moments, magnetic flags, pins and the moment model (display settings are per user, in QSettings). A recovery autosave follows every committed edit: debounced (2 s), flushed when another file is opened or the window closes, and named after the structure's content so files that share a name never share recovery data.
 
 ## 6b. Layer mode (Phase 3)
 

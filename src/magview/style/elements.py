@@ -44,10 +44,6 @@ class ElementStyles:
                 return cls(parse_elements_ini(vesta_dir / "elements.ini"), vesta_dir)
         return cls()
 
-    @property
-    def uses_vesta(self) -> bool:
-        return bool(self._vesta)
-
     def __getitem__(self, species: object) -> ElementStyle:
         return self.get(species)
 

@@ -14,7 +14,7 @@ MagView is built in phases; see `docs/reports/`. **Status: all phases (0–5) do
 ## Setup (Ubuntu 24.04 container or WSL)
 
 ```bash
-sudo scripts/setup_system_deps.sh            # idempotent; installs scripts/system-packages.txt
+sudo scripts/setup_system_deps.sh            # idempotent; installs scripts/system-packages.txt (as root: drop sudo)
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt    # every package pinned
 .venv/bin/pip install -e . --no-deps
@@ -46,7 +46,7 @@ Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel
 - Dragging a selected atom sets the whole selection.
 - `F` flips, `0` zeroes, `P` opens the Patterns menu (FM, Néel, stripe, zigzag, A/C/G-type).
 - A right-click opens the context menu.
-- `Ctrl+S` saves a `.magview.json` session; a recovery autosave runs after every edit.
+- `Ctrl+S` saves a `.magview.json` session; a recovery autosave follows every edit (offered back when you reopen the structure).
 
 **Layer mode** (`L`):
 - One magnetic layer at a time, seen along the stacking axis (default c).
