@@ -225,3 +225,24 @@ def test_shortcut_reference_lists_every_key():
         assert combo in keys_text, combo
     html = shortcut_reference_html()
     assert html.startswith("<table>") and "Layer mode" in html
+
+
+def test_set_magnitude_dialog_proposes_current_value():
+    """"Set |m|..." used to propose 1.0 whatever the selection carried; it now
+    proposes the current |m| (or the accepted suggestion for zero moments)."""
+    from magview.core.document import MagDocument
+    from magview.core.structure import CrystalStructure
+    from magview.core.suggest import ElementRuleSuggester
+    from magview.gui.main_window import default_magnitude
+
+    from conftest import DATA
+
+    doc = MagDocument.new(CrystalStructure.from_file(DATA / "NiO.cif"))
+    ni = [i for i, sym in enumerate(doc.canvas.structure.symbols) if sym == "Ni"]
+    doc.accept_suggestions([s for s in ElementRuleSuggester().suggest(doc.crystal).items
+                            if s.candidate], {})
+    assert default_magnitude(doc, ni) == 2.0  # Ni2+ spin-only, from the suggestion
+    doc.set_magnitude(ni[:3], 1.734)
+    assert default_magnitude(doc, ni[:3]) == 1.73
+    doc.zero(ni[:3])
+    assert default_magnitude(doc, ni[:3]) == 2.0  # zero moments: the accepted value

@@ -169,6 +169,12 @@ def scene_fingerprint(doc) -> tuple | None:
             doc.pinned.tobytes(), doc.collinear, doc.spin_axis.tobytes())
 
 
+def default_magnitude(doc, sites) -> float:
+    """Value proposed by "Set |m|...": the selection's current |m| (median), else its
+    suggested magnitude (MagDocument.magnitude_for), rounded like the dialog."""
+    return round(float(np.median(doc.magnitude_for(sorted(sites)))), 2)
+
+
 def recovery_autosave(crystal: CrystalStructure, opened: Path) -> Path | None:
     """The recovery autosave of this structure when it exists and is newer than the file
     being opened (None otherwise). Keyed by structure content, not just the file name."""
@@ -1426,7 +1432,12 @@ class MainWindow(QMainWindow):
     def _ask_magnitude(self) -> None:
         if self._editing_blocked("set moments"):
             return
-        val, ok = QInputDialog.getDouble(self, "Set |m|", "|m| (muB):", 1.0, 0.0, mg.MAX_MOMENT, 2)
+        if self.doc is None or not self.selection:
+            self.statusBar().showMessage("Select atoms first")
+            return
+        val, ok = QInputDialog.getDouble(self, "Set |m|", "|m| (muB):",
+                                         default_magnitude(self.doc, self.selection), 0.0,
+                                         mg.MAX_MOMENT, 2)
         if ok:
             self._edit(lambda s: self.doc.set_magnitude(s, val))
 
