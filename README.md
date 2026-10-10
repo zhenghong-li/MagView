@@ -126,6 +126,15 @@ artifacts/phaseN/     rendered evidence for each phase
 scripts/              dev tools: artifact galleries, test-structure generator
 ```
 
+## Contributors
+
+MagView is developed by Zhenghong Li, with assistance from:
+
+- **Claude**: the initial application, magnetic-ordering workflow, reviews and Linux/WSL support.
+- **OpenAI Codex**: native Windows source setup, compatibility fixes and GUI validation.
+
+AI assistance is credited through `Co-authored-by` trailers in commit messages.
+
 ## License
 
 [MIT](LICENSE) — use it for anything, just keep the copyright notice.
