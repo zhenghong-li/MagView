@@ -167,3 +167,18 @@ def test_session_spin_axis_normalized_on_load(doc, tmp_path):
     path.write_text(json.dumps(data))
     d2 = project.load(path)
     assert np.allclose(d2.spin_axis, [0, 0, 1]) and np.allclose(d2.moments, doc.moments)
+
+
+def test_autosave_dir_follows_xdg_cache_home(tmp_path, monkeypatch):
+    """Without MAGVIEW_AUTOSAVE_DIR, autosaves go to $XDG_CACHE_HOME/magview/autosave;
+    a relative XDG_CACHE_HOME is ignored (XDG spec) in favor of ~/.cache."""
+    monkeypatch.delenv(project.ENV_AUTOSAVE_DIR, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg-cache"))
+    assert project.autosave_dir() == tmp_path / "xdg-cache" / "magview" / "autosave"
+    monkeypatch.setenv("XDG_CACHE_HOME", "relative/cache")
+    assert project.autosave_dir() == tmp_path / "home" / ".cache" / "magview" / "autosave"
+    monkeypatch.delenv("XDG_CACHE_HOME")
+    assert project.autosave_dir() == tmp_path / "home" / ".cache" / "magview" / "autosave"
+    monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "explicit"))
+    assert project.autosave_dir() == tmp_path / "explicit"

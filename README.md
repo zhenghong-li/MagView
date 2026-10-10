@@ -61,6 +61,16 @@ Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel
 
 Views: `oblique` (default), `a`, `b`, `c`, `a*`, `b*`, `c*`.
 
+## Files MagView writes
+
+| What | Where | Override |
+|---|---|---|
+| Recovery autosaves (offered back when you reopen a structure) | `$XDG_CACHE_HOME/magview/autosave`, default `~/.cache/magview/autosave` | `MAGVIEW_AUTOSAVE_DIR=<dir>`; `MAGVIEW_AUTOSAVE_DIR=off` disables autosave |
+| Mock AgentDFT jobs | `~/.magview/agentdft_jobs` | `MAGVIEW_AGENTDFT_DIR=<dir>` |
+| Window layout and arrow settings | `~/.config/MagView/MagView.conf` (Qt settings) | `XDG_CONFIG_HOME` |
+
+Sessions (`.magview.json`), handoffs and images are written only where you save them.
+
 ## VESTA data
 
 MagView reads element colors and radii (`elements.ini`) and bond rules plus display defaults (`style.ini`) from your local VESTA installation **at runtime**. It looks first at `$MAGVIEW_VESTA_DIR`, then at `vesta_tools/VESTA-gtk3-x86_64` in any parent directory. VESTA's files are never copied into this repository, because its license forbids redistribution. Without VESTA, MagView falls back to pymatgen's approximate color scheme and covalent-radius bond rules. See `docs/vesta_reference.md`.

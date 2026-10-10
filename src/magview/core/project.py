@@ -134,8 +134,12 @@ def load(path: str | Path) -> MagDocument:
 
 
 def autosave_dir() -> Path:
+    """$MAGVIEW_AUTOSAVE_DIR, else $XDG_CACHE_HOME/magview/autosave (~/.cache when the
+    variable is unset or, per the XDG spec, not an absolute path)."""
     env = os.environ.get(ENV_AUTOSAVE_DIR)
-    base = Path(env) if env else Path.home() / ".cache" / "magview" / "autosave"
+    xdg = os.environ.get("XDG_CACHE_HOME", "")
+    cache = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".cache"
+    base = Path(env) if env else cache / "magview" / "autosave"
     base.mkdir(parents=True, exist_ok=True)
     return base
 
