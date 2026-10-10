@@ -252,8 +252,11 @@ def _broken_input_translations(doc, P, NA, maps_to) -> list[BrokenTranslation]:
     crystal = doc.crystal
     A = crystal.lattice_matrix
     cands = [("a", np.array([1.0, 0, 0])), ("b", np.array([0, 1.0, 0])), ("c", np.array([0, 0, 1.0]))]
-    # centring translations: primitive lattice points inside the input cell (excluding 0)
-    for t in lattice_points_in_cell(NA)[1:]:
+    # centring translations: primitive lattice points inside the input cell (excluding 0;
+    # the zero vector does not sort first when interior points have negative coordinates)
+    for t in lattice_points_in_cell(NA):
+        if not t.any():
+            continue
         f = (t @ P) @ np.linalg.inv(A)
         f = np.mod(f, 1.0)
         cands.append(("(" + ", ".join(_fraction(x) for x in f) + ") centring", f))

@@ -25,6 +25,9 @@ from magview.core.graph import NeighborGraph, miller_direction
 
 ANGLE_TOL_DEG = 8.0
 SQUARE_ASPECT_TOL = 0.02
+LAYER_TOL = 0.35  # Angstrom: max out-of-plane component of an in-plane bond (buckling);
+# shared with the layer clustering in core.batch, so a buckled layer is never
+# accepted as one layer and then rejected here as "unsupported"
 
 
 @dataclass(frozen=True)
@@ -60,19 +63,24 @@ def _angle_mod_180(v: np.ndarray, e1: np.ndarray, e2: np.ndarray) -> np.ndarray:
     return np.degrees(np.arctan2(v @ e2, v @ e1)) % 180.0
 
 
-def classify(graph: NeighborGraph, normal: np.ndarray, lattice: np.ndarray) -> Lattice2D:
-    """Classify the planar nearest-neighbour graph (bonds must lie in the plane)."""
+def classify(graph: NeighborGraph, normal: np.ndarray, lattice: np.ndarray,
+             plane_tol: float = LAYER_TOL) -> Lattice2D:
+    """Classify the planar nearest-neighbour graph.
+
+    Bonds may leave the plane by up to ``plane_tol`` along the normal (buckling);
+    direction classes and bond lengths are computed from the in-plane projections.
+    """
     normal = np.asarray(normal, float) / np.linalg.norm(normal)
     none = np.full(graph.m, -1, dtype=int)
     if graph.m == 0:
         return Lattice2D("unsupported", (), none, 0, "no nearest-neighbour bonds")
-    out_of_plane = np.abs(graph.vec @ normal) > 0.25
-    if out_of_plane.any():
+    z_out = graph.vec @ normal
+    if np.any(np.abs(z_out) > plane_tol):
         return Lattice2D("unsupported", (), none, 0, "nearest-neighbour bonds leave the plane")
-    e1 = graph.vec[0] - (graph.vec[0] @ normal) * normal
-    e1 /= np.linalg.norm(e1)
+    vec = graph.vec - np.outer(z_out, normal)
+    e1 = vec[0] / np.linalg.norm(vec[0])
     e2 = np.cross(normal, e1)
-    ang = _angle_mod_180(graph.vec, e1, e2)
+    ang = _angle_mod_180(vec, e1, e2)
 
     # Cluster bond angles (circular, period 180 deg).
     order = np.argsort(ang)
@@ -93,9 +101,9 @@ def classify(graph: NeighborGraph, normal: np.ndarray, lattice: np.ndarray) -> L
     classes = []
     for ci, ks in enumerate(members):
         bond_class[ks] = ci
-        v = graph.vec[ks[0]]
+        v = vec[ks[0]]
         classes.append(BondClass(ci, v / np.linalg.norm(v), miller_direction(v, lattice),
-                                 float(np.mean(np.linalg.norm(graph.vec[ks], axis=1)))))
+                                 float(np.mean(np.linalg.norm(vec[ks], axis=1)))))
     z = int(graph.coordination().max())
     nc = len(classes)
     kind, reason = "unsupported", ""

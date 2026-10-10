@@ -19,10 +19,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from magview.core.graph import neighbor_graph, propagate
-from magview.core.lattice2d import bond_signs, classify, library
+from magview.core.lattice2d import LAYER_TOL, bond_signs, classify, library
 
 PLANE_TOL = 0.35  # Angstrom: max deviation from the plane for a "planar" selection
-LAYER_TOL = 0.35  # Angstrom: sites closer than this along the axis share a layer
 
 
 @dataclass(frozen=True)
@@ -58,12 +57,14 @@ def planar_axis(canvas_struct, sites: np.ndarray) -> int | None:
     return None
 
 
-def layer_index(canvas_struct, sites: np.ndarray, k: int) -> tuple[np.ndarray, bool]:
+def layer_index(canvas_struct, sites: np.ndarray, k: int,
+                tol: float = LAYER_TOL) -> tuple[np.ndarray, bool]:
     """Layer number of each site along canvas axis k and whether the layers wrap periodically.
 
-    Layers are clusters of the (circular) coordinate along k. They "wrap" when the
-    selection spans the whole canvas period with roughly even spacing, in which case
-    alternation must be consistent across the periodic boundary.
+    Layers are clusters of the (circular) coordinate along k: a gap larger than
+    ``tol`` (Angstrom) starts a new layer. They "wrap" when the selection spans the
+    whole canvas period with roughly even spacing, in which case alternation must
+    be consistent across the periodic boundary.
     """
     frac, period = _axis_coords(canvas_struct, sites, k)
     order = np.argsort(frac)
@@ -71,12 +72,12 @@ def layer_index(canvas_struct, sites: np.ndarray, k: int) -> tuple[np.ndarray, b
     labels = np.zeros(len(sites), dtype=int)
     cur = 0
     for a in range(1, len(xs)):
-        if xs[a] - xs[a - 1] > LAYER_TOL:
+        if xs[a] - xs[a - 1] > tol:
             cur += 1
         labels[order[a]] = cur
     # Merge the last layer into the first if they touch across the boundary.
     sorted_labels = labels[order]
-    if cur > 0 and (xs[0] + period) - xs[-1] <= LAYER_TOL:
+    if cur > 0 and (xs[0] + period) - xs[-1] <= tol:
         xs = np.where(sorted_labels == cur, xs - period, xs)
         labels[labels == cur] = 0
         sorted_labels = labels[order]

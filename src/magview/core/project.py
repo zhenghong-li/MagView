@@ -17,6 +17,7 @@ import numpy as np
 from pymatgen.core import Lattice, Structure
 
 from magview import __version__
+from magview.core import magnetic as mg
 from magview.core.canvas import Canvas
 from magview.core.document import MagDocument
 from magview.core.structure import CrystalStructure
@@ -54,26 +55,63 @@ def to_dict(doc: MagDocument) -> dict:
     }
 
 
+def _index_array(data: dict, key: str, upper: int) -> np.ndarray:
+    """An index list from the file, validated against the array it indexes into."""
+    idx = np.asarray(data.get(key, []), dtype=int)
+    if idx.ndim != 1 or (len(idx) and (idx.min() < 0 or idx.max() >= upper)):
+        raise ProjectError(f"{key} contains an index out of range 0..{upper - 1}")
+    return idx
+
+
 def from_dict(data: dict) -> MagDocument:
     if data.get("format") != FORMAT:
         raise ProjectError("not a MagView project file")
     if int(data.get("version", 0)) > VERSION:
         raise ProjectError(f"project version {data['version']} is newer than this MagView")
-    st = data["structure"]
-    struct = Structure(Lattice(st["lattice"]), st["species"], st["frac_coords"], labels=st["labels"])
+    st = data.get("structure")
+    if not isinstance(st, dict):
+        raise ProjectError("missing or invalid structure block")
+    for key in ("lattice", "species", "frac_coords", "labels"):
+        if key not in st:
+            raise ProjectError(f"structure.{key} is missing")
+    try:
+        struct = Structure(Lattice(st["lattice"]), st["species"], st["frac_coords"],
+                           labels=st["labels"])
+    except (TypeError, ValueError) as exc:
+        raise ProjectError(f"invalid structure: {exc}") from exc
     source = Path(data["source_file"]) if data.get("source_file") else None
     crystal = CrystalStructure.from_pymatgen(struct, source=source, symprec=data.get("symprec", 1e-3))
-    canvas = Canvas.build(crystal, data["canvas_matrix"])
-    moments = np.array(data["moments_cartesian_muB"], dtype=float).reshape(-1, 3)
+    try:
+        canvas = Canvas.build(crystal, data["canvas_matrix"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ProjectError(f"invalid canvas_matrix: {exc}") from exc
+    try:
+        raw = np.asarray(data.get("moments_cartesian_muB", []), dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ProjectError(f"invalid moments_cartesian_muB: {exc}") from exc
+    if raw.size % 3:
+        raise ProjectError(f"moments_cartesian_muB has {raw.size} values, not a multiple of 3")
+    moments = raw.reshape(-1, 3)
     if len(moments) != len(canvas):
         raise ProjectError(f"{len(moments)} moments for a canvas of {len(canvas)} sites")
     magnetic = np.zeros(len(crystal), bool)
-    magnetic[data.get("magnetic_input_sites", [])] = True
+    magnetic[_index_array(data, "magnetic_input_sites", len(crystal))] = True
+    site_magnitude = np.asarray(data.get("site_magnitude", np.zeros(len(crystal))), dtype=float)
+    if site_magnitude.shape != (len(crystal),):
+        raise ProjectError(f"site_magnitude has {site_magnitude.size} entries for "
+                           f"{len(crystal)} input sites")
+    spin_axis = np.asarray(data.get("spin_axis", [0, 0, 1]), dtype=float)
+    if spin_axis.shape != (3,):
+        raise ProjectError("spin_axis must be a 3-vector")
+    if not np.linalg.norm(spin_axis) > 0:
+        raise ProjectError("spin_axis is the zero vector")
+    collinear = bool(data.get("collinear", True))
+    if collinear and not mg.is_collinear(moments, spin_axis):
+        raise ProjectError("collinear is true but moments_cartesian_muB are not all along "
+                           "spin_axis")
     doc = MagDocument(crystal, canvas, moments, magnetic,
-                      spin_axis=np.array(data.get("spin_axis", [0, 0, 1]), dtype=float),
-                      collinear=bool(data.get("collinear", True)),
-                      site_magnitude=np.array(data.get("site_magnitude", np.zeros(len(crystal)))))
-    doc.pinned[data.get("pinned_canvas_sites", [])] = True
+                      spin_axis=spin_axis, collinear=collinear, site_magnitude=site_magnitude)
+    doc.pinned[_index_array(data, "pinned_canvas_sites", len(canvas))] = True
     return doc
 
 

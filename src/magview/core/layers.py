@@ -53,7 +53,9 @@ class LayerDecomposition:
 
 def decompose(canvas_struct, sites, input_lattice: np.ndarray, axis: str = "c",
               tol: float = LAYER_TOL) -> LayerDecomposition:
-    """Layers of ``sites`` (canvas indices) along canvas axis ``axis``."""
+    """Layers of ``sites`` (canvas indices) along canvas axis ``axis``.
+
+    Sites closer than ``tol`` (Angstrom) along the axis share a layer."""
     k = AXES.index(axis)
     lat = canvas_struct.lattice_matrix
     normal = np.cross(lat[(k + 1) % 3], lat[(k + 2) % 3])
@@ -67,7 +69,7 @@ def decompose(canvas_struct, sites, input_lattice: np.ndarray, axis: str = "c",
         if len(el_sites) == 1:
             labels = np.zeros(1, int)
         else:
-            labels, _ = layer_index(canvas_struct, el_sites, k)
+            labels, _ = layer_index(canvas_struct, el_sites, k, tol)
         frac = canvas_struct.frac_coords[el_sites, k]
         for L in range(labels.max() + 1):
             members = el_sites[labels == L]

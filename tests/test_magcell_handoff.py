@@ -144,6 +144,17 @@ def test_explanations(load):
     assert "chemical cell suffices" in cell.explanation[0]
 
 
+def test_nio_afm2_breaks_every_fcc_centring(load):
+    """fcc has three face centrings; AFM-II breaks all of them (regression: the zero
+    primitive translation does not sort first, so slicing it away dropped (0,1/2,1/2))."""
+    cell = minimal_magnetic_cell(nio_afm2(load))
+    names = [b.name for b in cell.broken]
+    for f in ("(0, 1/2, 1/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)"):
+        assert f"{f} centring" in names
+    for f in ("(0, 1/2, 1/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)"):
+        assert any(f in e for e in cell.explanation)
+
+
 def test_hnf_and_lattice_equality():
     B = hnf_basis(np.array([[2, 0, 0], [0, 2, 0], [0, 0, 1], [1, 1, 0]]))
     assert round(abs(np.linalg.det(B))) == 2
@@ -180,6 +191,11 @@ def test_handoff_valid_and_labels(handoff):
 @pytest.mark.parametrize("tamper, needle", [
     (lambda h: h.__setitem__("multiplicity", 3), "multiplicity"),
     (lambda h: h["magnetic_cell"]["lattice"][0].__setitem__(0, 99.0), "supercell_matrix @ reference"),
+    (lambda h: h.__setitem__("supercell_matrix_input", [[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+     "supercell_matrix_input"),
+    (lambda h: h["unfolding"]["supercell_matrix"][0].__setitem__(0, 5), "unfolding.supercell_matrix"),
+    (lambda h: h["reference_cell"]["parent_input_site"].__setitem__(0, 99),
+     "reference_cell.parent_input_site"),
     (lambda h: h.__setitem__("requires_unfolding", False), "requires_unfolding"),
     (lambda h: h["dft_hints"]["vasp"].__setitem__("MAGMOM", "1 2"), "MAGMOM"),
     (lambda h: h["moments"]["vectors"][0].__setitem__(0, 0.7), "collinear"),
@@ -191,6 +207,17 @@ def test_handoff_tampering_detected(handoff, tamper, needle):
     tamper(h)
     errors = validate_handoff(h)
     assert errors and any(needle in e for e in errors), errors
+
+
+def test_nio_handoff_valid_with_null_input_matrix(load):
+    """NiO AFM-II: no integral matrix vs the input cell (supercell_matrix_input is null);
+    the handoff must still validate, and the explanation names all three fcc centrings."""
+    h = build_handoff(nio_afm2(load))
+    assert h["supercell_matrix_input"] is None
+    assert validate_handoff(h) == []
+    text = " | ".join(h["explanation"])
+    for f in ("(0, 1/2, 1/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)"):
+        assert f in text
 
 
 def test_noncollinear_handoff(load):

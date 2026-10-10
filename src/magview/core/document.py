@@ -118,7 +118,7 @@ class MagDocument:
         current moments are not periodic in the new canvas."""
         new = Canvas.build(self.crystal, matrix)
         moments = self.canvas.resize_moments(new, self.moments)
-        pinned = self.canvas.transfer(new, self.pinned).astype(bool)
+        pinned = self.canvas.transfer_any(new, self.pinned)
         self._commit(f"Canvas {self.canvas.describe()} -> {new.describe()}", canvas=new,
                      moments=moments, pinned=pinned)
 

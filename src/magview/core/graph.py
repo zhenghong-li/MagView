@@ -89,6 +89,7 @@ class Propagation:
     signs: np.ndarray  # (n,) +1/-1 per site (relative within each component)
     component: np.ndarray  # (n,) component label
     conflicts: np.ndarray  # (k,) bond indices whose sign is violated
+    anchor_conflicts: np.ndarray  # anchored sites whose demanded sign was not met
 
     @property
     def n_components(self) -> int:
@@ -96,14 +97,16 @@ class Propagation:
 
     @property
     def consistent(self) -> bool:
-        return len(self.conflicts) == 0
+        return len(self.conflicts) == 0 and len(self.anchor_conflicts) == 0
 
 
 def propagate(graph: NeighborGraph, bond_sign: np.ndarray, anchors: dict[int, int] | None = None) -> Propagation:
     """Site signs such that s_i * s_j == bond_sign for every bond (where possible).
 
     Each connected component starts from its anchored site (``anchors``: local
-    index -> sign) or from its lowest index with +1. Conflicting bonds are listed.
+    index -> sign) or from its lowest index with +1. Conflicting bonds are listed;
+    so is every anchor whose demanded sign the BFS could not honour (contradictory
+    anchors in one component).
     """
     n = graph.n
     bond_sign = np.asarray(bond_sign, dtype=int)
@@ -133,7 +136,8 @@ def propagate(graph: NeighborGraph, bond_sign: np.ndarray, anchors: dict[int, in
         label += 1
     conflicts = np.array([k for k, (a, b) in enumerate(zip(graph.i, graph.j))
                           if signs[a] * signs[b] != bond_sign[k]], dtype=int)
-    return Propagation(signs, comp, conflicts)
+    anchor_conflicts = np.array(sorted(s for s, v in anchors.items() if signs[s] != v), dtype=int)
+    return Propagation(signs, comp, conflicts, anchor_conflicts)
 
 
 def miller_direction(vec: np.ndarray, lattice: np.ndarray, max_index: int = 6) -> str:

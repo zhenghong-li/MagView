@@ -25,7 +25,9 @@ The machine-readable schema is `src/magview/io/handoff.schema.json` (JSON Schema
 
 ## Consistency rules (beyond the schema)
 - The lengths of `frac_coords`, `labels`, `parent_input_site` and `moments.vectors` equal the number of magnetic sites.
-- `magnetic_cell.lattice == supercell_matrix @ reference_cell.lattice` (1e-4 Å).
+- `magnetic_cell.lattice == supercell_matrix @ reference_cell.lattice` (1e-4 Å), and — when `supercell_matrix_input` is not null — `magnetic_cell.lattice == supercell_matrix_input @ input_cell.lattice` (1e-4 Å).
+- `unfolding.supercell_matrix == supercell_matrix` (exact, integer matrices).
+- `parent_input_site` indices (magnetic and reference cells) are within the input cell's site count.
 - `multiplicity == |det S|`, and the number of magnetic sites equals `multiplicity × len(reference_cell.species)`.
 - `requires_unfolding == (multiplicity > 1)`; `unfolding` is present when it is true.
 - Collinear: every vector lies along `spin_axis`, and `signed_magnitudes` match.

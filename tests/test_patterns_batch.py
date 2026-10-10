@@ -65,6 +65,21 @@ def test_propagate_anchor():
     assert list(p.signs) == [-1, 1, -1] and p.consistent
 
 
+def test_propagate_contradictory_anchors_conflict():
+    """Two anchors in one component demanding opposite signs: the BFS order must not
+    silently win; the anchor whose demand was not met is a conflict."""
+    from magview.core.graph import NeighborGraph
+
+    g = NeighborGraph(np.arange(3), np.zeros((3, 3)), np.array([0, 1]), np.array([1, 2]),
+                      np.zeros((2, 3)), 1.0)
+    p = propagate(g, np.ones(2, int), anchors={0: 1, 1: -1})  # FM bonds, contradictory demands
+    assert not p.consistent
+    assert len(p.conflicts) == 0  # the bonds agree with the assigned signs ...
+    assert list(p.anchor_conflicts) == [1]  # ... but anchor 1's demand was overridden
+    ok = propagate(g, np.ones(2, int), anchors={0: 1, 1: 1, 2: 1})
+    assert ok.consistent and not len(ok.anchor_conflicts)
+
+
 @pytest.mark.parametrize("vec, label", [((1, 0, 0), "[100]"), ((0.5, 0.5, 0), "[110]"),
                                         ((1, -1, 0), "[1-10]"), ((-2, 0, 0), "[100]")])
 def test_miller_direction(vec, label):

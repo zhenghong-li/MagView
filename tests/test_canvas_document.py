@@ -163,6 +163,21 @@ def test_failed_resize_changes_nothing(load):
     assert np.allclose(doc.moments, snapshot)
 
 
+def test_resize_shrink_keeps_pins(load):
+    """FM 2x2x2 canvas; a pin in cell [0,0,1] must survive shrinking to 1x1x1
+    (the pin's old site folds onto a kept site, so the new site is pinned)."""
+    doc = MagDocument.new(load("toy_square_CuO2"), (2, 2, 2))
+    doc.accept_suggestions(list(ElementRuleSuggester().suggest(doc.crystal).candidates))
+    site = int(np.nonzero(np.all(doc.canvas.translation == [0, 0, 1], axis=1))[0][0])
+    parent = int(doc.canvas.parent[site])
+    doc.layer_set([site], 1)
+    doc.resize_canvas((1, 1, 1))
+    assert doc.pinned.sum() == 1
+    assert doc.pinned[int(np.nonzero(doc.canvas.parent == parent)[0][0])]
+    doc.history.undo()  # undo the resize: the original pin is back, nothing duplicated
+    assert doc.pinned.sum() == 1 and doc.pinned[site]
+
+
 def test_site_label(load):
     doc = MagDocument.new(load("Cs3V9Te13_300K"))
     i = int(np.nonzero(doc.canvas.translation[:, 0] == 1)[0][0])

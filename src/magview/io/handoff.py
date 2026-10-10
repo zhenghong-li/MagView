@@ -217,6 +217,15 @@ def validate_handoff(data: dict) -> list[str]:
     det = int(round(abs(np.linalg.det(S))))
     if not np.allclose(np.array(mc["lattice"]), S @ np.array(ref["lattice"]), atol=1e-4):
         errors.append("magnetic_cell.lattice != supercell_matrix @ reference_cell.lattice")
+    M = data.get("supercell_matrix_input")
+    if M is not None and not np.allclose(np.array(mc["lattice"]),
+                                         np.array(M, float) @ np.array(data["input_cell"]["lattice"]),
+                                         atol=1e-4):
+        errors.append("magnetic_cell.lattice != supercell_matrix_input @ input_cell.lattice")
+    unf = data.get("unfolding")
+    if unf is not None and not np.array_equal(np.array(unf["supercell_matrix"], dtype=np.int64),
+                                              np.array(data["supercell_matrix"], dtype=np.int64)):
+        errors.append("unfolding.supercell_matrix != supercell_matrix")
     if det != data["multiplicity"]:
         errors.append(f"multiplicity {data['multiplicity']} != |det(supercell_matrix)| = {det}")
     if n != det * len(ref["species"]):
@@ -229,6 +238,13 @@ def validate_handoff(data: dict) -> list[str]:
     n_in = len(data["input_cell"]["species"])
     if any(p >= n_in for p in mc["parent_input_site"]):
         errors.append("magnetic_cell.parent_input_site out of range")
+    ref_parent = ref.get("parent_input_site")
+    if ref_parent is not None:
+        if len(ref_parent) != len(ref["species"]):
+            errors.append(f"reference_cell.parent_input_site has {len(ref_parent)} "
+                          f"entries for {len(ref['species'])} sites")
+        elif any(p >= n_in for p in ref_parent):
+            errors.append("reference_cell.parent_input_site out of range")
     vec = np.array(mom["vectors"], float).reshape(-1, 3)
     if mom["collinear"]:
         u = np.array(mom["spin_axis"], float)

@@ -62,6 +62,39 @@ def test_groups_by_element():
     assert all(L.lattice.kind == "square" for L in dec.layers)
 
 
+def buckled_honeycomb():
+    """Silicene-like buckled honeycomb: NN = 2.28 A, sublattices offset by 0.30 A along c."""
+    from pymatgen.core import Lattice, Structure
+
+    from magview.core.structure import CrystalStructure
+
+    lat = Lattice.hexagonal(2.28 * np.sqrt(3), 20.0)
+    return CrystalStructure.from_pymatgen(
+        Structure(lat, ["Si", "Si"], [[1 / 3, 2 / 3, 0.5 - 0.0075], [2 / 3, 1 / 3, 0.5 + 0.0075]]))
+
+
+def test_buckled_honeycomb_classifies():
+    """Buckling up to LAYER_TOL stays one layer and classifies (regression: the
+    out-of-plane bond test used a tighter 0.25 A cutoff than the layer clustering)."""
+    from magview.core.canvas import Canvas
+
+    c = buckled_honeycomb()
+    cv = Canvas.build(c, (2, 2, 1))
+    dec = decompose(cv.structure, np.arange(len(cv)), c.lattice_matrix)
+    assert len(dec.layers) == 1
+    assert dec.layers[0].lattice.kind == "honeycomb"
+
+
+def test_decompose_threads_tol():
+    from magview.core.canvas import Canvas
+
+    c = buckled_honeycomb()
+    cv = Canvas.build(c, (1, 1, 1))
+    sites = np.arange(len(cv))
+    assert len(decompose(cv.structure, sites, c.lattice_matrix).layers) == 1
+    assert len(decompose(cv.structure, sites, c.lattice_matrix, tol=0.1).layers) == 2
+
+
 # --- matcher: worked examples -------------------------------------------------------
 
 def bond_pair(L, cls):

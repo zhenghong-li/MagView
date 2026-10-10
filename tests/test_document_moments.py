@@ -102,6 +102,29 @@ def test_session_errors(tmp_path):
         project.load(bad)
 
 
+@pytest.mark.parametrize("tamper, needle", [
+    (lambda d: d.__setitem__("moments_cartesian_muB", d["moments_cartesian_muB"][:-1]),
+     "moments"),
+    (lambda d: d["moments_cartesian_muB"].__setitem__(0, [0.0, 0.0]),
+     "moments_cartesian_muB"),
+    (lambda d: d.__setitem__("magnetic_input_sites", [10 ** 6]), "magnetic_input_sites"),
+    (lambda d: d.__setitem__("pinned_canvas_sites", [10 ** 6]), "pinned_canvas_sites"),
+    (lambda d: d.__setitem__("site_magnitude", [1.0]), "site_magnitude"),
+    (lambda d: d.__setitem__("spin_axis", [0.0, 0.0, 0.0]), "spin_axis"),
+    (lambda d: d.__setitem__("spin_axis", [0.0, 1.0]), "spin_axis"),
+    (lambda d: d["moments_cartesian_muB"].__setitem__(0, [1.0, 0.0, 0.0]), "collinear"),
+    (lambda d: d.__setitem__("canvas_matrix", [[1, 0], [0, 1]]), "canvas_matrix"),
+    (lambda d: d.pop("structure"), "structure"),
+])
+def test_session_tampering_raises_project_error(doc, tamper, needle):
+    """Truncated or tampered session dicts raise ProjectError naming the field,
+    never a bare numpy error (or a crash much later)."""
+    data = json.loads(json.dumps(project.to_dict(doc)))
+    tamper(data)
+    with pytest.raises(project.ProjectError, match=needle):
+        project.from_dict(data)
+
+
 def test_autosave_dir(doc, tmp_path, monkeypatch):
     monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "auto"))
     path = project.autosave(doc)

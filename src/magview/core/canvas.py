@@ -146,3 +146,12 @@ class Canvas:
         """Carry per-site values onto canvas ``new`` by periodic lookup (no consistency check)."""
         values = np.asarray(values)
         return np.array([values[self.index_of(p, r)] for p, r in zip(new.parent, new.translation)])
+
+    def transfer_any(self, new: "Canvas", flags: np.ndarray) -> np.ndarray:
+        """Carry per-site flags onto canvas ``new``: a new site is flagged if its periodic
+        image in the old canvas was flagged OR any old site folding onto it was flagged
+        (a shrink maps many old sites onto one new site)."""
+        out = self.transfer(new, flags).astype(bool)
+        idx = np.array([new.index_of(p, r) for p, r in zip(self.parent, self.translation)])
+        np.logical_or.at(out, idx, np.asarray(flags, dtype=bool))
+        return out
