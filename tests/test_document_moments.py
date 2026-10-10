@@ -128,5 +128,31 @@ def test_session_tampering_raises_project_error(doc, tamper, needle):
 def test_autosave_dir(doc, tmp_path, monkeypatch):
     monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "auto"))
     path = project.autosave(doc)
-    assert path.parent == tmp_path / "auto" and path.name == "NiO.magview.json"
+    assert path.parent == tmp_path / "auto"
+    assert path.name == f"NiO-{project.structure_key(doc.crystal)}.magview.json"
     assert np.allclose(project.load(path).moments, doc.moments)
+
+
+def test_autosave_keyed_by_structure_not_file_name(load, tmp_path, monkeypatch):
+    """Two different structures saved under the same file name (every POSCAR) keep
+    separate recovery files; the same structure re-loaded (or from its session) maps
+    to the same one."""
+    from pymatgen.core import Lattice, Structure
+
+    from magview.core.structure import CrystalStructure
+
+    monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "auto"))
+    paths = []
+    for i, a in enumerate((3.9, 4.2)):
+        d = tmp_path / f"dir{i}"
+        d.mkdir()
+        Structure(Lattice.cubic(a), ["Ni", "O"], [[0, 0, 0], [.5, .5, .5]]).to(
+            filename=str(d / "POSCAR"), fmt="poscar")
+        paths.append(project.autosave_path(CrystalStructure.from_file(d / "POSCAR")))
+    assert paths[0] != paths[1] and paths[0].name.startswith("POSCAR-")
+    nio = load("NiO")
+    again = CrystalStructure.from_file(nio.source)
+    assert project.autosave_path(again) == project.autosave_path(nio)
+    doc = MagDocument.new(nio)
+    session = project.save(doc, tmp_path / "s.magview.json")
+    assert project.autosave_path(project.load(session).crystal) == project.autosave_path(nio)

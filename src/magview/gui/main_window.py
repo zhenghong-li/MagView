@@ -10,7 +10,6 @@ edit goes through the document's undo history and triggers a recovery autosave.
 from __future__ import annotations
 
 import os
-import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -122,11 +121,11 @@ def scene_fingerprint(doc) -> tuple | None:
             doc.pinned.tobytes(), doc.collinear, doc.spin_axis.tobytes())
 
 
-def recovery_autosave(doc_name: str, opened: Path) -> Path | None:
-    """The recovery autosave for ``doc_name`` when it exists and is newer than the file
-    being opened (None otherwise)."""
+def recovery_autosave(crystal: CrystalStructure, opened: Path) -> Path | None:
+    """The recovery autosave of this structure when it exists and is newer than the file
+    being opened (None otherwise). Keyed by structure content, not just the file name."""
     try:
-        auto = project.autosave_dir() / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', doc_name)}.magview.json"
+        auto = project.autosave_path(crystal)
         if auto.is_file() and (not opened.is_file()
                                or auto.stat().st_mtime > opened.stat().st_mtime + 1e-6):
             return auto
@@ -546,7 +545,7 @@ class MainWindow(QMainWindow):
         """Offer to restore a newer recovery autosave over the file just opened."""
         if not self.autosave_enabled:
             return doc
-        auto = recovery_autosave(doc.crystal.name, opened)
+        auto = recovery_autosave(doc.crystal, opened)
         if auto is None:
             return doc
         when = datetime.fromtimestamp(auto.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")

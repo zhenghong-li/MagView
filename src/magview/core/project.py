@@ -8,6 +8,7 @@ mu_B per canvas site, in canvas-site order, which is a deterministic function of
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -138,6 +139,22 @@ def autosave_dir() -> Path:
     return base
 
 
+def structure_key(crystal: CrystalStructure) -> str:
+    """Short content hash of the input structure (lattice, species, coordinates)."""
+    h = hashlib.sha256()
+    h.update(np.round(crystal.lattice_matrix, 6).tobytes())
+    h.update(np.round(crystal.frac_coords, 6).tobytes())
+    h.update("|".join(str(site.specie) for site in crystal.structure).encode())
+    return h.hexdigest()[:10]
+
+
+def autosave_path(crystal: CrystalStructure) -> Path:
+    """Recovery file of a structure. The name carries a content hash: files that share
+    a name (every POSCAR, every structure.cif) must neither overwrite each other's
+    recovery data nor be offered each other's edits on open."""
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", crystal.name)
+    return autosave_dir() / f"{name}-{structure_key(crystal)}.magview.json"
+
+
 def autosave(doc: MagDocument) -> Path:
-    name = re.sub(r"[^A-Za-z0-9_.-]", "_", doc.crystal.name)
-    return save(doc, autosave_dir() / f"{name}.magview.json")
+    return save(doc, autosave_path(doc.crystal))

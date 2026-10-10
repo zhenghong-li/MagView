@@ -73,23 +73,35 @@ def test_scene_fingerprint_discriminates_moment_only(load):
     assert scene_fingerprint(doc) != fp1
 
 
-def test_recovery_autosave_candidate(tmp_path, monkeypatch):
-    """recovery_autosave finds the recovery file only when it is newer than the
-    file being opened."""
+def test_recovery_autosave_candidate(load, tmp_path, monkeypatch):
+    """recovery_autosave finds the recovery file of the same structure only, and only
+    when it is newer than the file being opened."""
+    from pymatgen.core import Lattice, Structure
+
     from magview.core import project
+    from magview.core.structure import CrystalStructure
     from magview.gui.main_window import recovery_autosave
 
     monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "autosave"))
+    nio = load("NiO")
     session = tmp_path / "NiO.magview.json"
     session.write_text("{}")
-    assert recovery_autosave("NiO", session) is None  # no autosave yet
-    auto = project.autosave_dir() / "NiO.magview.json"
+    assert recovery_autosave(nio, session) is None  # no autosave yet
+    auto = project.autosave_path(nio)
     auto.write_text("{}")
     old = session.stat().st_mtime
     os.utime(auto, (old - 10, old - 10))  # autosave older than the session: no offer
-    assert recovery_autosave("NiO", session) is None
+    assert recovery_autosave(nio, session) is None
     os.utime(auto, (old + 10, old + 10))  # autosave newer: offered
-    assert recovery_autosave("NiO", session) == auto
-    assert recovery_autosave("Other phase!", session) is None  # name sanitizing
+    assert recovery_autosave(nio, session) == auto
     missing = tmp_path / "gone.magview.json"
-    assert recovery_autosave("NiO", missing) == auto  # opened file gone: still offered
+    assert recovery_autosave(nio, missing) == auto  # opened file gone: still offered
+    # A different structure that happens to have the same file name is never offered
+    # this recovery file (it used to be: autosaves were keyed by the file stem only).
+    other_dir = tmp_path / "other"
+    other_dir.mkdir()
+    Structure(Lattice.cubic(5.0), ["Mn", "O"], [[0, 0, 0], [.5, .5, .5]]).to(
+        filename=str(other_dir / "NiO.cif"))
+    other = CrystalStructure.from_file(other_dir / "NiO.cif")
+    assert other.name == nio.name
+    assert recovery_autosave(other, missing) is None
