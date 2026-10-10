@@ -589,6 +589,9 @@ def test_configure_offscreen_only_without_display(monkeypatch):
 
     from magview.render import offscreen
 
+    # configure_offscreen() may setdefault VTK_DEFAULT_OPENGL_WINDOW via plain
+    # os.environ -- register it with monkeypatch first so teardown cleans it up.
+    monkeypatch.delenv("VTK_DEFAULT_OPENGL_WINDOW", raising=False)
     monkeypatch.setattr(pv, "OFF_SCREEN", False)
     monkeypatch.setenv("DISPLAY", ":99")
     offscreen.configure_offscreen()
@@ -597,3 +600,60 @@ def test_configure_offscreen_only_without_display(monkeypatch):
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
     offscreen.configure_offscreen()
     assert pv.OFF_SCREEN is True
+
+
+def test_bonds_render_visible_pixels():
+    """Bonds must actually draw on screen. Regression for the cell-scalar rgb
+    path that rendered as hairlines on some GL drivers (WSLg Mesa).
+
+    Runs in a subprocess: GL state pollution between tests makes in-process
+    plotter creation unreliable (segfaults observed on WSLg GLX)."""
+    import os
+    import subprocess
+    import sys
+
+    # scrub possibly leaked GL window hints from other tests
+    env = {k: v for k, v in os.environ.items() if k != "VTK_DEFAULT_OPENGL_WINDOW"}
+    script = """
+import warnings; warnings.filterwarnings("ignore")
+import numpy as np
+from magview.core.structure import CrystalStructure
+from magview.render.model import build_scene_model
+from magview.render.offscreen import make_plotter
+from magview.render.scene import StructureScene
+from magview.style.appearance import Appearance
+
+app = Appearance.load()
+crystal = CrystalStructure.from_file("tests/data/NiO.cif")
+pl = make_plotter()
+scene = StructureScene(pl, app.theme, flat_shading=True, show_axes=False)
+scene.set_model(build_scene_model(crystal, app), reset_camera=True)
+pl.render()
+with_bonds = pl.screenshot(return_img=True)
+scene.set_model(build_scene_model(crystal, app, show_bonds=False), reset_camera=False)
+pl.render()
+without_bonds = pl.screenshot(return_img=True)
+pl.close()
+changed = int(np.count_nonzero(np.any(with_bonds != without_bonds, axis=-1)))
+print("CHANGED_PIXELS", changed)
+assert changed > 20000, f"bonds repainted only {changed} px"
+"""
+    proc = subprocess.run([sys.executable, "-c", script], capture_output=True,
+                          text=True, timeout=300, env=env)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+
+
+def test_bond_tubes_use_point_data_rgb(load, appearance):
+    """Cell-data rgb on tube strips is not portable; bonds must use point data.
+    Query the VTK-level input (the Python mesh wrapper may be gone by GC)."""
+    from magview.render.offscreen import make_plotter
+    from magview.render.scene import StructureScene
+
+    pl = make_plotter()
+    scene = StructureScene(pl, appearance.theme)
+    scene.set_model(build_scene_model(load("NiO"), appearance), reset_camera=False)
+    assert scene._bond_mesh is not None
+    rgb = scene._bond_mesh.point_data["rgb"]
+    assert rgb.dtype == np.uint8 and rgb.shape == (scene._bond_mesh.n_points, 3)
+    pl.close()
+

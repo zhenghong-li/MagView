@@ -79,6 +79,16 @@ def main(argv=None) -> int:
     win.raise_()
     QTest.qWaitForWindowActive(win, 3000)
     QTest.qWait(200)
+    # Probe: the QOpenGLWidget viewport cannot initialize GL on some platforms
+    # (e.g. Qt's offscreen platform without GL support). Report as unavailable
+    # (77) instead of crashing deeper in the checks.
+    from PySide6.QtOpenGLWidgets import QOpenGLWidget
+    if isinstance(win.viewport, QOpenGLWidget):
+        app.processEvents()
+        QTest.qWait(200)
+        if not win.viewport.isValid():
+            print("[SKIP] GL viewport cannot initialize on this platform")
+            return 77
     assert win.load_file(args.file)
     QTest.qWait(500)
 
@@ -940,7 +950,11 @@ def phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, src) -> Non
     check("patterns centroid needs a selection", win._selection_centroid_global() is None)
 
     # 32. Window geometry persists via QSettings (a fresh window restores it).
-    win.resize(win.width() - 120, max(400, win.height() - 60))  # post-show, so it sticks
+    # Stay inside the available screen: restoreGeometry() clamps out-of-screen
+    # sizes (xvfb's default screen is only 1280x1024), which would fake a failure.
+    avail = win.screen().availableGeometry()
+    win.resize(min(win.width() - 120, avail.width() - 100),
+               max(400, min(win.height() - 60, avail.height() - 100)))
     QTest.qWait(80)
     win.settings.setValue("window/geometry", win.saveGeometry())  # what closeEvent saves
     win.settings.setValue("window/state", win.saveState())
@@ -956,8 +970,12 @@ def phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, src) -> Non
         from magview.gui.main_window import MainWindow
 
         w2 = MainWindow()
-        check("window geometry restored from QSettings",
-              (w2.width(), w2.height()) == expected, f"{w2.width()}x{w2.height()}")
+        # headless X servers have no window manager, so restored geometry can
+        # differ by a few pixels (frame extents); compare with a tolerance.
+        ok = (abs(w2.width() - expected[0]) <= 24
+              and abs(w2.height() - expected[1]) <= 24)
+        check("window geometry restored from QSettings", ok,
+              f"expected {expected[0]}x{expected[1]}, got {w2.width()}x{w2.height()}")
         w2.close()
         QTest.qWait(60)
 

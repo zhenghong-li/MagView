@@ -108,6 +108,7 @@ class StructureScene:
     def set_model(self, model: SceneModel, reset_camera: bool = True) -> None:
         for name in list(self.actors):
             self.plotter.remove_actor(self.actors.pop(name), render=False)
+        self._bond_mesh = None
         self.model = model
         t = self.theme
         n_atoms = len(model.atoms)
@@ -124,8 +125,11 @@ class StructureScene:
             lines = pv.PolyData()
             lines.points = model.bond_segments.reshape(-1, 3)
             lines.lines = np.column_stack([np.full(n, 2), 2 * np.arange(n), 2 * np.arange(n) + 1]).ravel()
-            lines.cell_data["rgb"] = _to_uint8(model.bond_rgb)
+            # Point data, not cell data: cell rgb on the tube filter's triangle strips
+            # renders as hairlines/garbage on some GL drivers (seen on WSLg's Mesa).
+            lines.point_data["rgb"] = _to_uint8(np.repeat(model.bond_rgb, 2, axis=0))
             tubes = lines.tube(radius=t.bond_radius, n_sides=self._bond_sides, capping=False)
+            self._bond_mesh = tubes  # strong ref: pyvista mappers weakref their input
             self.actors["bonds"] = self.plotter.add_mesh(
                 tubes, scalars="rgb", rgb=True, name="bonds", **self._material())
 

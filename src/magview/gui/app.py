@@ -20,6 +20,19 @@ def run(path: str | None = None, screenshot: str | None = None, view: str | None
     app = QApplication.instance() or QApplication(sys.argv[:1])
     win = MainWindow()
     win.show()
+    if screenshot:
+        # Batch/capture mode must never block: reject any unexpected modal dialog
+        # (e.g. the crash-recovery prompt when a stale autosave exists). Armed
+        # before load_file because the prompt fires during loading.
+        def reject_modals() -> None:
+            modal = app.activeModalWidget()
+            if modal is not None and modal.objectName() != "busy_progress":
+                print(f"note: rejected modal dialog in capture mode: {modal.windowTitle()!r}")
+                modal.reject() if hasattr(modal, "reject") else modal.close()
+
+        watchdog = QTimer()
+        watchdog.timeout.connect(reject_modals)
+        watchdog.start(400)
     if path:
         if not win.load_file(path) and screenshot:
             return 1
