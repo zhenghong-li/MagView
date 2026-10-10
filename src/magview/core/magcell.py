@@ -152,16 +152,67 @@ def _nice_input_matrix(mag_lattice: np.ndarray, input_lattice: np.ndarray) -> np
     return np.rint(best).astype(np.int64)
 
 
+class PeriodicIndex:
+    """Exact periodic position matching against a fixed set of fractional points.
+
+    A KD-tree over the wrapped fractional coordinates (periodic box of side 1) finds
+    the fractional-nearest candidate within a radius that provably contains every
+    point closer than POS_TOL_A in Cartesian space (||df|| <= ||dx|| * ||L^-1||_2);
+    the candidate is then confirmed in Cartesian Angstrom. Tolerance-based on purpose:
+    hashing rounded coordinates splits sites whose coordinates sit on rounding
+    boundaries (CIF values such as 0.1555). O(N log N), unlike an N x N distance
+    matrix (minutes and gigabytes on a 5000-site canvas).
+    """
+
+    def __init__(self, ref: np.ndarray, lattice: np.ndarray) -> None:
+        from scipy.spatial import cKDTree
+
+        self.lattice = np.asarray(lattice, dtype=float)
+        self.ref = _wrap(np.asarray(ref, dtype=float).reshape(-1, 3))
+        self.radius = POS_TOL_A * np.linalg.norm(np.linalg.inv(self.lattice), 2) * (1 + 1e-6) + 1e-12
+        self.tree = cKDTree(self.ref, boxsize=1.0) if len(self.ref) else None
+
+    def _cart_dist(self, q: np.ndarray, j: np.ndarray) -> np.ndarray:
+        d = q - self.ref[j]
+        d -= np.rint(d)
+        return np.linalg.norm(d @ self.lattice, axis=-1)
+
+    def match(self, query: np.ndarray) -> np.ndarray:
+        """Index of the ref point at each query position (within POS_TOL_A), else -1."""
+        q = _wrap(np.asarray(query, dtype=float).reshape(-1, 3))
+        out = np.full(len(q), -1, dtype=int)
+        if self.tree is None or len(q) == 0:
+            return out
+        _, j = self.tree.query(q, k=1, distance_upper_bound=self.radius)
+        found = j < len(self.ref)
+        ok = np.zeros(len(q), dtype=bool)
+        ok[found] = self._cart_dist(q[found], j[found]) <= POS_TOL_A
+        out[ok] = j[ok]
+        return out
+
+    def first_occurrences(self) -> np.ndarray:
+        """Indices of the ref points that are not duplicates of an earlier ref point
+        (duplicates = same position within POS_TOL_A), in increasing order."""
+        if self.tree is None:
+            return np.zeros(0, dtype=int)
+        keep = np.ones(len(self.ref), dtype=bool)
+        for i, cands in enumerate(self.tree.query_ball_point(self.ref, self.radius)):
+            earlier = [c for c in cands if c < i]
+            if earlier and np.any(self._cart_dist(self.ref[i], np.array(earlier)) <= POS_TOL_A):
+                keep[i] = False
+        return np.nonzero(keep)[0]
+
+
+def _wrap(f: np.ndarray) -> np.ndarray:
+    g = np.mod(f, 1.0)
+    g[g >= 1.0] = 0.0  # np.mod(-1e-17, 1.0) == 1.0; the periodic KD-tree needs [0, 1)
+    return g
+
+
 def _periodic_match(query: np.ndarray, ref: np.ndarray, lattice: np.ndarray) -> np.ndarray:
     """For each fractional ``query`` point, the index of the ``ref`` point at the same
-    position (periodic, within POS_TOL_A), or -1. Tolerance-based on purpose: hashing
-    rounded coordinates splits sites whose coordinates sit on rounding boundaries
-    (CIF values such as 0.1555)."""
-    d = query[:, None, :] - ref[None, :, :]
-    d -= np.rint(d)
-    dist = np.linalg.norm(d @ lattice, axis=-1)
-    j = np.argmin(dist, axis=1)
-    return np.where(dist[np.arange(len(query)), j] <= POS_TOL_A, j, -1)
+    position (periodic, within POS_TOL_A), or -1 (see PeriodicIndex)."""
+    return PeriodicIndex(ref, lattice).match(query)
 
 
 def _fraction(x: float) -> str:
@@ -190,10 +241,12 @@ def minimal_magnetic_cell(doc: MagDocument) -> MagneticCell:
 
     frac = canvas.structure.frac_coords
     species = np.array(canvas.structure.symbols)
-    moments = doc.moments
+    moments = doc.moments.copy()  # a snapshot: the GUI runs this on a worker thread
+    index = PeriodicIndex(frac, C)
+    inv_c = np.linalg.inv(C)
 
     def maps_to(t_cart: np.ndarray) -> np.ndarray | None:
-        out = _periodic_match(frac + t_cart @ np.linalg.inv(C), frac, C)
+        out = index.match(frac + t_cart @ inv_c)
         if np.any(out < 0) or np.any(species[out] != species):
             return None
         return out
@@ -223,10 +276,7 @@ def minimal_magnetic_cell(doc: MagDocument) -> MagneticCell:
     inv_m = np.linalg.inv(mag_lattice)
     cart = frac @ C
     folded = cart @ inv_m
-    order = []
-    for i in range(len(frac)):
-        if not order or _periodic_match(folded[i:i + 1], folded[order], mag_lattice)[0] < 0:
-            order.append(i)
+    order = PeriodicIndex(folded, mag_lattice).first_occurrences().tolist()
     # group by species in order of first appearance in the input cell (POSCAR convention)
     sp_order = list(dict.fromkeys(crystal.symbols))
     order.sort(key=lambda i: (sp_order.index(species[i]), i))
@@ -238,7 +288,7 @@ def minimal_magnetic_cell(doc: MagDocument) -> MagneticCell:
     if len(order) != round(expected_n):
         raise RuntimeError(f"magnetic cell has {len(order)} sites, expected {expected_n:g}")
 
-    broken = _broken_input_translations(doc, P, NA, maps_to)
+    broken = _broken_input_translations(doc, P, NA, maps_to, moments)
     explanation = _explain(crystal, mult, S_in, int(round(abs(np.linalg.det(NA)))), broken)
     cell = MagneticCell(P, S_ref, S_in, mag_lattice, [str(s) for s in species[order]], mfrac,
                         moments[order].copy(), parent, [crystal.labels[p] for p in parent], mult,
@@ -247,7 +297,7 @@ def minimal_magnetic_cell(doc: MagDocument) -> MagneticCell:
     return _with_msg(cell, doc)
 
 
-def _broken_input_translations(doc, P, NA, maps_to) -> list[BrokenTranslation]:
+def _broken_input_translations(doc, P, NA, maps_to, moments) -> list[BrokenTranslation]:
     """Input-cell translations (a, b, c and centrings) that change the moments."""
     crystal = doc.crystal
     A = crystal.lattice_matrix
@@ -266,13 +316,13 @@ def _broken_input_translations(doc, P, NA, maps_to) -> list[BrokenTranslation]:
         m = maps_to(f @ A)
         if m is None:
             continue
-        diff = np.linalg.norm(doc.moments[m] - doc.moments, axis=1) > MOMENT_TOL
+        diff = np.linalg.norm(moments[m] - moments, axis=1) > MOMENT_TOL
         if diff.any():
             i = int(np.nonzero(diff)[0][0])
             j = int(m[i])
 
             def tag(k):
-                v = doc.moments[k]
+                v = moments[k]
                 s = v @ axis
                 d = "up" if s > 1e-6 else "down" if s < -1e-6 else f"{np.round(v, 2).tolist()}"
                 return f"{crystal.labels[doc.canvas.parent[k]]} ({d})"

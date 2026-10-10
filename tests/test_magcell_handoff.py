@@ -11,7 +11,14 @@ from magview.bridge.agentdft import HandoffRejected, MockAgentDFTBridge
 from magview.core.batch import pattern_options
 from magview.core.document import MagDocument
 from magview.core.layers import decompose
-from magview.core.magcell import as_structure, hnf_basis, minimal_magnetic_cell, same_lattice
+from magview.core.magcell import (
+    POS_TOL_A,
+    PeriodicIndex,
+    as_structure,
+    hnf_basis,
+    minimal_magnetic_cell,
+    same_lattice,
+)
 from magview.core.patterns import match_layer
 from magview.core.stacking import fm_reference, stacking_library
 from magview.core.structure import CrystalStructure
@@ -153,6 +160,55 @@ def test_nio_afm2_breaks_every_fcc_centring(load):
         assert f"{f} centring" in names
     for f in ("(0, 1/2, 1/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)"):
         assert any(f in e for e in cell.explanation)
+
+
+def _bruteforce_match(query, ref, lattice):
+    d = query[:, None, :] - ref[None, :, :]
+    d -= np.rint(d)
+    dist = np.linalg.norm(d @ lattice, axis=-1)
+    j = np.argmin(dist, axis=1)
+    return np.where(dist[np.arange(len(query)), j] <= POS_TOL_A, j, -1)
+
+
+def test_periodic_index_matches_bruteforce():
+    """The KD-tree matcher agrees with the exhaustive periodic search, including a skewed
+    triclinic cell, coordinates sitting on 1e-3 rounding half-points (the Cs3V9Te13 case),
+    points across the periodic boundary and near-misses just outside the tolerance."""
+    rng = np.random.default_rng(7)
+    lattice = Lattice.from_parameters(7.1, 9.3, 12.4, 61.0, 78.0, 112.0).matrix
+    ref = rng.random((400, 3))
+    ref[:20] = np.round(ref[:20], 4) + 5e-4  # 0.xxx5: exactly on rounding half-points
+    ref[20:30, 0] = 1e-12  # on the boundary
+    inv = np.linalg.inv(lattice)
+    jitter = rng.normal(size=(400, 3))
+    jitter /= np.linalg.norm(jitter, axis=1, keepdims=True)
+    # half the queries are matches (0.3 x tolerance away), half near-misses (2 x tolerance)
+    scale = np.where(np.arange(400) % 2 == 0, 0.3, 2.0)[:, None] * POS_TOL_A
+    query = ref + (jitter * scale) @ inv + rng.integers(-2, 3, size=(400, 3))  # + lattice shifts
+    query[20:30, 0] -= 2e-12  # just below 0 -> wraps to ~1
+    got = PeriodicIndex(ref, lattice).match(query)
+    assert np.array_equal(got, _bruteforce_match(query, ref, lattice))
+    assert (got[::2] == np.arange(0, 400, 2)).all() and (got[1::2] == -1).all()
+
+
+def test_periodic_index_first_occurrences():
+    lattice = np.diag([4.0, 5.0, 6.0])
+    pts = np.array([[0.1, 0.2, 0.3], [0.5, 0.5, 0.5], [1.1, 0.2, 0.3 + 1e-4],
+                    [0.9999999, 0.0, 0.0], [0.0, 1.0, 1.0], [0.5, 0.5, 0.5 + 0.01]])
+    assert PeriodicIndex(pts, lattice).first_occurrences().tolist() == [0, 1, 3, 5]
+
+
+def test_minimal_cell_large_canvas_is_fast(load):
+    """5400-site canvas (Cs3V9Te13, 6x6x6) with AFM stacking: the dense N x N matcher
+    took ~4 minutes and 2.6 GB here; the periodic KD-tree takes about a second."""
+    import time
+
+    d = afm_stack(doc_for(load, "Cs3V9Te13_300K", (6, 6, 6)))
+    t0 = time.perf_counter()
+    cell = minimal_magnetic_cell(d)
+    assert time.perf_counter() - t0 < 30
+    assert cell.multiplicity == 2 and len(cell.species) == 50
+    assert same_lattice(cell.supercell_matrix_input, np.diag([1, 1, 2]))
 
 
 def test_hnf_and_lattice_equality():
