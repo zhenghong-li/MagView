@@ -74,7 +74,7 @@ class MockAgentDFTBridge(AgentDFTBridge):
         job_id = _dt.datetime.now().strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:8]
         job_dir = self.root / job_id
         job_dir.mkdir(parents=True, exist_ok=False)
-        (job_dir / "handoff.json").write_text(json.dumps(handoff, indent=1))
+        (job_dir / "handoff.json").write_text(json.dumps(handoff, indent=1), encoding="utf-8")
         kind = "non-collinear" if handoff["moments"]["collinear"] is False else "collinear"
         history = [
             {"t": _now(), "status": "received", "detail": "handoff validated"},
@@ -85,11 +85,11 @@ class MockAgentDFTBridge(AgentDFTBridge):
         ]
         ticket = JobTicket(job_id, "started (simulated)", str(job_dir), history,
                            "Mock AgentDFT: no calculation is actually run.")
-        (job_dir / "job.json").write_text(json.dumps(asdict(ticket), indent=1))
+        (job_dir / "job.json").write_text(json.dumps(asdict(ticket), indent=1), encoding="utf-8")
         return ticket
 
     def status(self, job_id: str) -> JobTicket:
         path = self.root / job_id / "job.json"
         if not path.is_file():
             raise KeyError(f"unknown job {job_id}")
-        return JobTicket(**json.loads(path.read_text()))
+        return JobTicket(**json.loads(path.read_text(encoding="utf-8")))

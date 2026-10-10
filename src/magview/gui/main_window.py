@@ -53,7 +53,7 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 from pyvistaqt import QtInteractor  # noqa: E402
 
-from magview import __version__  # noqa: E402
+from magview import __version__, osdeps  # noqa: E402
 from magview.core import interaction as ia  # noqa: E402
 from magview.core import magnetic as mg  # noqa: E402
 from magview.core import project  # noqa: E402
@@ -350,7 +350,10 @@ class MainWindow(QMainWindow):
         self._scene_fp: tuple | None = None  # fingerprint of the document shown in the main scene
         self._pending_workers: set = set()
         self.suggester = ElementRuleSuggester()
-        self.settings = settings if settings is not None else QSettings("MagView", "MagView")
+        settings_path = osdeps.settings_file() if settings is None else None
+        self.settings = settings if settings is not None else (
+            QSettings(str(settings_path), QSettings.IniFormat) if settings_path is not None
+            else QSettings("MagView", "MagView"))
         self.setWindowTitle(f"MagView {__version__}")
         self.resize(1480, 900)
 

@@ -128,14 +128,14 @@ def from_dict(data: dict) -> MagDocument:
 def save(doc: MagDocument, path: str | Path) -> Path:
     path = Path(path)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(to_dict(doc), indent=1))
-    os.replace(tmp, path)  # atomic: a crash never leaves a half-written project
+    tmp.write_text(json.dumps(to_dict(doc), indent=1), encoding="utf-8")
+    osdeps.atomic_replace(tmp, path)  # a crash never leaves a half-written project
     return path
 
 
 def load(path: str | Path) -> MagDocument:
     try:
-        data = json.loads(Path(path).read_text())
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ProjectError(f"cannot read {path}: {exc}") from exc
     return from_dict(data)

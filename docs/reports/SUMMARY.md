@@ -1,5 +1,11 @@
 # MagView: summary of the work (start here)
 
+**Windows update (2026-10-10):** Native source setup is available in
+[platforms/windows](../../platforms/windows/README.md). Windows validation:
+326 tests passed, 5 platform-specific skips; native GUI NiO 92/92 and
+Cs3V9Te13 88/88. See the [Windows validation report](../../platforms/windows/VALIDATION.md).
+The phase and Linux results below are the earlier development record.
+
 All six phases of the approved plan are implemented and committed, one commit per phase:
 
 ```

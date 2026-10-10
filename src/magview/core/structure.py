@@ -41,7 +41,7 @@ def _reject_magview_json(path: Path) -> None:
     """MagView's own JSON files are not structures; say what they are instead of
     letting pymatgen fail with an opaque KeyError."""
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return  # not JSON we know: let pymatgen report it
     if not isinstance(data, dict):

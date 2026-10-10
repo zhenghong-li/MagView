@@ -1,6 +1,7 @@
 """Document moment edits (each one undo step) and session files."""
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -92,6 +93,22 @@ def test_session_round_trip(doc, tmp_path):
     assert d2.crystal.symmetry.number == 225 and d2.crystal.labels == doc.crystal.labels
 
 
+def test_session_utf8_labels_and_paths(doc, tmp_path):
+    folder = tmp_path / "磁性 calculation"
+    folder.mkdir()
+    path = folder / "磁矩.magview.json"
+    payload = project.to_dict(doc)
+    payload["structure"]["labels"][0] = "磁矩 μB 🧲"
+    payload["source_file"] = str(folder / "结构.cif")
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    loaded = project.load(path)
+    assert loaded.crystal.labels[0] == "磁矩 μB 🧲"
+    assert loaded.crystal.source == folder / "结构.cif"
+    project.save(loaded, path)
+    assert project.load(path).crystal.labels == loaded.crystal.labels
+    assert not path.with_suffix(path.suffix + ".tmp").exists()
+
+
 def test_session_errors(tmp_path):
     bad = tmp_path / "bad.magview.json"
     bad.write_text(json.dumps({"format": "something-else"}))
@@ -172,6 +189,10 @@ def test_session_spin_axis_normalized_on_load(doc, tmp_path):
 def test_autosave_dir_follows_xdg_cache_home(tmp_path, monkeypatch):
     """Without MAGVIEW_AUTOSAVE_DIR, autosaves go to $XDG_CACHE_HOME/magview/autosave;
     a relative XDG_CACHE_HOME is ignored (XDG spec) in favor of ~/.cache."""
+    from magview import osdeps
+
+    monkeypatch.setattr(osdeps, "PLATFORM", "linux")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     monkeypatch.delenv(project.ENV_AUTOSAVE_DIR, raising=False)
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg-cache"))

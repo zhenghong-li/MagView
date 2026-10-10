@@ -1,7 +1,6 @@
 """Command line and GUI smoke tests (subprocesses)."""
 
 import os
-import shutil
 import subprocess
 import sys
 
@@ -9,7 +8,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from conftest import DATA, gui_env, run_subprocess
+from conftest import DATA, GUI_AVAILABLE, gui_command, gui_env, run_subprocess
 
 
 def test_cli_render(tmp_path):
@@ -31,11 +30,11 @@ def test_cli_bad_file(tmp_path):
 
 
 @pytest.mark.gui
-@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+@pytest.mark.skipif(not GUI_AVAILABLE, reason="desktop or xvfb-run required")
 def test_gui_shell_screenshot(tmp_path):
     out = tmp_path / "gui.png"
     proc = run_subprocess(
-        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m", "magview",
+        [*gui_command(), "-m", "magview",
          str(DATA / "NiO.cif"), "--gui-screenshot", str(out)], timeout=180, env=gui_env())
     assert proc.returncode == 0, proc.stdout + proc.stderr
     img = np.asarray(Image.open(out).convert("RGB")).astype(int)
@@ -47,7 +46,7 @@ def test_gui_shell_screenshot(tmp_path):
 
 
 @pytest.mark.gui
-@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+@pytest.mark.skipif(not GUI_AVAILABLE, reason="desktop or xvfb-run required")
 @pytest.mark.parametrize("name", ["NiO", "Cs3V9Te13_300K"])
 def test_gui_selftest(tmp_path, name):
     """Real Qt events: click, Shift-click, camera drag, long-press box, Esc, accept,
@@ -55,7 +54,7 @@ def test_gui_selftest(tmp_path, name):
     import json
 
     proc = run_subprocess(
-        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+        [*gui_command(), "-m",
          "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(tmp_path)], timeout=300,
         env=gui_env())
     results = json.loads((tmp_path / "selftest.json").read_text())
@@ -79,22 +78,23 @@ s.sync()
 
 
 @pytest.mark.gui
-@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+@pytest.mark.skipif(not GUI_AVAILABLE, reason="desktop or xvfb-run required")
 def test_capture_mode_ignores_user_settings(tmp_path):
     """--gui-screenshot is a batch run: a small window layout saved by an earlier
     interactive session must not shrink the capture, and the capture must not write
     the user's settings or recovery autosaves (this once made the shell-screenshot
     test depend on whoever ran the GUI last)."""
-    conf = tmp_path / "xdg" / "MagView" / "MagView.conf"
+    conf = tmp_path / "xdg" / "MagView" / "MagView.ini"
     conf.parent.mkdir(parents=True)
-    env = gui_env(XDG_CONFIG_HOME=str(tmp_path / "xdg"), MAGVIEW_AUTOSAVE_DIR=str(tmp_path / "autosave"))
+    env = gui_env(XDG_CONFIG_HOME=str(tmp_path / "xdg"), MAGVIEW_SETTINGS_DIR=str(conf.parent),
+                  MAGVIEW_AUTOSAVE_DIR=str(tmp_path / "autosave"))
     seed = run_subprocess([sys.executable, "-c", SEED_SETTINGS, str(conf)], timeout=60,
                           env=dict(env, QT_QPA_PLATFORM="offscreen"))
     assert seed.returncode == 0 and conf.is_file(), seed.stderr
     before = conf.read_bytes()
     out = tmp_path / "gui.png"
     proc = run_subprocess(
-        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m", "magview",
+        [*gui_command(), "-m", "magview",
          str(DATA / "NiO.cif"), "--gui-screenshot", str(out)], timeout=180, env=env)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert Image.open(out).size[0] > 1000  # default layout, not the saved 500 x 400
@@ -114,7 +114,7 @@ def test_gui_env_drops_offscreen_config(monkeypatch):
 
 
 FRESH_FRAMES = """
-import os, sys, tempfile, resource
+import os, sys, tempfile, time
 from PySide6.QtCore import QSettings, QTimer, QEventLoop
 from PySide6.QtWidgets import QApplication
 app = QApplication(sys.argv)
@@ -157,7 +157,7 @@ win.step_layer(1); fresh("next layer")
 win.toggle_layer_mode(); fresh("layer mode off (camera restored)")
 win.resize_canvas([2, 2, 1]); fresh("canvas resize")
 win.set_view("oblique"); fresh("oblique view")
-def cpu(): r = resource.getrusage(resource.RUSAGE_SELF); return r.ru_utime + r.ru_stime
+def cpu(): return time.process_time()
 idle(500); c0 = cpu(); idle(2000); used = cpu() - c0
 check(used < 0.3, f"idle window uses no CPU ({used:.2f} s CPU over 2 s)")
 win.close()
@@ -166,14 +166,14 @@ sys.exit(1 if fail else 0)
 
 
 @pytest.mark.gui
-@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+@pytest.mark.skipif(not GUI_AVAILABLE, reason="desktop or xvfb-run required")
 def test_gui_renders_on_change_not_on_a_timer(tmp_path):
     """pyvistaqt's default auto_update re-rendered both views 5x per second forever
     (2-4 CPU cores busy on an idle window with software GL). Without it, every scene
     change must render by itself: after each operation the last rendered camera must
     equal the live camera (a missed render leaves a stale frame on screen)."""
     proc = run_subprocess(
-        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-c", FRESH_FRAMES,
+        [*gui_command(), "-c", FRESH_FRAMES,
          str(DATA / "NiO.cif")], timeout=300,
         env=gui_env(MAGVIEW_AUTOSAVE_DIR="off", XDG_CONFIG_HOME=str(tmp_path / "xdg")))
     assert proc.returncode == 0 and "[FAIL]" not in proc.stdout, proc.stdout + proc.stderr
@@ -195,7 +195,7 @@ def test_selftest_flag_dispatches_to_the_gui_selftest(monkeypatch, tmp_path):
 
 
 @pytest.mark.gui
-@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+@pytest.mark.skipif(not GUI_AVAILABLE, reason="desktop or xvfb-run required")
 def test_selftest_rerun_into_same_out_dir(tmp_path, monkeypatch):
     """A second self-test into the same --out found the first run's autosave, and the
     recovery prompt failed the run (seen when the release build ran twice)."""
@@ -207,7 +207,7 @@ def test_selftest_rerun_into_same_out_dir(tmp_path, monkeypatch):
     doc = MagDocument.new(CrystalStructure.from_file(DATA / "NiO.cif"))
     project.autosave(doc)  # what an earlier run leaves behind (newer than the CIF)
     proc = run_subprocess(
-        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+        [*gui_command(), "-m",
          "magview.gui.selftest", str(DATA / "NiO.cif"), "--out", str(tmp_path), "--phase1-only"],
         timeout=300, env=gui_env())
     assert proc.returncode == 0 and "[FAIL]" not in proc.stdout, proc.stdout + proc.stderr

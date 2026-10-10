@@ -21,6 +21,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "tests" / "data"
 SETUP_SCRIPT = ROOT / "platforms" / "linux-wsl" / "setup_system_deps.sh"
+GUI_AVAILABLE = sys.platform in ("win32", "darwin") or shutil.which("xvfb-run") is not None
 
 PREFLIGHT = """
 from magview.render.offscreen import make_plotter
@@ -41,6 +42,8 @@ def pytest_configure(config):
     home = Path(tempfile.mkdtemp(prefix="magview-tests-"))
     config._magview_test_home = home
     os.environ["XDG_CONFIG_HOME"] = str(home / "config")
+    os.environ["MAGVIEW_SETTINGS_DIR"] = str(home / "config")
+    os.environ["PYTHONUTF8"] = "1"
     os.environ["MAGVIEW_AUTOSAVE_DIR"] = str(home / "autosave")
     os.environ["MAGVIEW_AGENTDFT_DIR"] = str(home / "agentdft_jobs")
 
@@ -62,16 +65,29 @@ def gui_env(**overrides) -> dict:
     return env
 
 
+def gui_command(*args) -> list[str]:
+    """Use the real Windows/macOS desktop, and an isolated X server on Linux."""
+    prefix = [] if sys.platform in ("win32", "darwin") else [
+        "xvfb-run", "-a", "-s", "-screen 0 1600x1000x24"]
+    return [*prefix, sys.executable, *args]
+
+
 def run_subprocess(cmd, timeout: float, **kwargs) -> subprocess.CompletedProcess:
     """``subprocess.run(capture_output=True, text=True)`` that kills the whole process
     group on timeout: killing only ``xvfb-run`` leaves its Xvfb server and the GUI
     process running forever."""
+    group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {
+        "start_new_session": True}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                            start_new_session=True, **kwargs)
+                            encoding="utf-8", errors="replace", **group, **kwargs)
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
         out, err = proc.communicate()
         pytest.fail(f"timed out after {timeout} s: {' '.join(map(str, cmd))}\n{out}\n{err}")
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
@@ -83,9 +99,10 @@ def pytest_sessionstart(session):
                           timeout=120)
     if proc.returncode != 0:
         tail = "\n".join((proc.stderr or proc.stdout).strip().splitlines()[-8:])
+        fix = ("Check the graphics driver (OpenGL 3.2+) and platforms/windows/README.md."
+               if sys.platform == "win32" else f"Fix: sudo {SETUP_SCRIPT}")
         pytest.exit(
-            "Offscreen rendering preflight failed: system libraries are probably missing "
-            f"(container recreated?).\nFix: sudo {SETUP_SCRIPT}\n--- preflight output ---\n{tail}",
+            f"Offscreen rendering preflight failed.\n{fix}\n--- preflight output ---\n{tail}",
             returncode=3,
         )
 

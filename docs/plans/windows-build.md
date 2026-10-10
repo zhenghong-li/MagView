@@ -9,6 +9,8 @@
 
 **Out of scope:** Windows on ARM (it runs the x64 build under emulation; there are no native ARM64 VTK wheels to build against) and the Microsoft Store.
 
+**Implementation update (2026-10-10):** Native source support now lives in [platforms/windows](../../platforms/windows/README.md), including the Windows dependency lock, setup/launch scripts, native test harness and high-DPI self-test coordinates. The current delivery is source-only. Executable packaging, installer, signing, software rendering and CI portions below remain optional roadmap items. See the [validation report](../../platforms/windows/VALIDATION.md) for checks actually run.
+
 ## What already works for Windows
 - All dependencies ship Windows x64 wheels: PySide6-Essentials, VTK, pymatgen, spglib, numpy, scipy.
 - The PyInstaller spec, launcher and license collector in `packaging/` are shared.

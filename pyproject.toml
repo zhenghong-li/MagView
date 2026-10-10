@@ -38,7 +38,7 @@ testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "render: needs an offscreen OpenGL context (OSMesa/EGL)",
-    "gui: needs Xvfb and launches the Qt GUI in a subprocess",
+    "gui: launches native Qt GUI (Windows/macOS) or Xvfb (Linux) in a subprocess",
     "vesta: needs a local VESTA installation (elements.ini/style.ini)",
 ]
 filterwarnings = [

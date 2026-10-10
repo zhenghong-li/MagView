@@ -1,0 +1,462 @@
+[
+  {
+    "step": "click selects one site",
+    "ok": true,
+    "detail": "site 56"
+  },
+  {
+    "step": "shift-click adds",
+    "ok": true,
+    "detail": "[39, 56]"
+  },
+  {
+    "step": "drag rotates camera",
+    "ok": true,
+    "detail": "camera moved 24.728"
+  },
+  {
+    "step": "long-press arms box",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "box selects sites inside",
+    "ok": true,
+    "detail": "46 selected, 46 expected"
+  },
+  {
+    "step": "Esc clears selection",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "accept sets edited moments",
+    "ok": true,
+    "detail": "Ni0 (4a): |m| = [np.float64(1.7)]"
+  },
+  {
+    "step": "Ctrl+Z undoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+Y redoes accept",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "canvas 2x2x2 -> 1x1x1",
+    "ok": true,
+    "detail": "8 sites"
+  },
+  {
+    "step": "undo canvas resize",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Ctrl+A selects magnetic sites",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "M enters moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag up sets +axis moment",
+    "ok": true,
+    "detail": "m = [0.0, 0.0, 1.661]"
+  },
+  {
+    "step": "drag is one undo step",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "collinear drag down sets -axis moment",
+    "ok": true,
+    "detail": "m = [-0.0, -0.0, -1.661]"
+  },
+  {
+    "step": "Esc cancels a drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "dead zone: tiny drag changes nothing",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "non-collinear drag with X lock",
+    "ok": true,
+    "detail": "m = [-3.449, -0.0, -0.0]"
+  },
+  {
+    "step": "free non-collinear drag follows the cursor",
+    "ok": true,
+    "detail": "|m| = 1.61"
+  },
+  {
+    "step": "projected back to collinear",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "F flips",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "0 zeroes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "drag on a selected atom sets the whole selection",
+    "ok": true,
+    "detail": "32 sites"
+  },
+  {
+    "step": "patterns menu built",
+    "ok": true,
+    "detail": "9 entries"
+  },
+  {
+    "step": "apply pattern A-type along c",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "session save/load round trip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "autosave written after edits",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Esc exits moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "L enters layer mode",
+    "ok": true,
+    "detail": "Ni layer 0  h = 0.00 A  (8 sites, square)"
+  },
+  {
+    "step": "clear layer: nothing pinned",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "two parallel neighbours -> FM + stripe candidates",
+    "ok": true,
+    "detail": "['fm', 'stripe:[110]']"
+  },
+  {
+    "step": "antiparallel neighbours -> Neel + other stripe",
+    "ok": true,
+    "detail": "['neel', 'stripe:[1-10]']"
+  },
+  {
+    "step": "hover preview does not edit",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "apply Neel completes the layer (all NN bonds antiparallel)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "undo completion",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "right-click unsets a pin",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "PgDn steps to the next layer",
+    "ok": true,
+    "detail": "4 layers"
+  },
+  {
+    "step": "Esc leaves layer mode, 3D scene back",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "stacking reference from layer 0",
+    "ok": true,
+    "detail": "reference built from layer 0 through 4 layer(s)"
+  },
+  {
+    "step": "stacking idle until another layer is assigned",
+    "ok": true,
+    "detail": "assign a spin in another layer to get a stacking suggestion"
+  },
+  {
+    "step": "one flipped site in layer 1 suggests AFM stacking",
+    "ok": true,
+    "detail": "relations (1, -1, None, None) -> ['afm', 'uudd:1']"
+  },
+  {
+    "step": "apply AFM stacking: layers alternate",
+    "ok": true,
+    "detail": "(1, -1, 1, -1)"
+  },
+  {
+    "step": "flip this layer (custom)",
+    "ok": true,
+    "detail": "(1, 1, 1, -1)"
+  },
+  {
+    "step": "custom flips -> no canonical stacking",
+    "ok": true,
+    "detail": "no stacking pattern agrees with the assigned layers"
+  },
+  {
+    "step": "A-type along c applied for export",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "analyze: minimal magnetic cell",
+    "ok": true,
+    "detail": "<b>supercell REQUIRED</b>: 2 x chemical primitive cell, 4 sites.<br>Relative to the input cell: <b>not a supercell of the input cell</b><br>requires_unfolding = True"
+  },
+  {
+    "step": "handoff valid",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "preview shows the magnetic cell",
+    "ok": true,
+    "detail": "4 sites"
+  },
+  {
+    "step": "preview off restores the canvas",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "handoff saved and re-validates",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "mock AgentDFT: job stored, started (simulated)",
+    "ok": true,
+    "detail": "20261010-201042-e36a78f5"
+  },
+  {
+    "step": "bridge status round trip",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "an edit invalidates the analysis",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "analyze for preview",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "read-only preview blocks edits, selection, info and menus",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "undo during preview exits it and restores the camera",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "unticking the preview restores the user's camera",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "moment-only edit keeps the scene (in-place set_moments)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "fast-path failure falls back to a rebuild",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "the fast path resumes after a fallback",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "re-analyze after fast-path edits",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "preview banner shown",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "recovery offer can be declined",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "loading a file drops the preview banner",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "corrupt session file: friendly dialog, document untouched",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "save session for recovery test",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "newer recovery autosave offered and restored",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "autosave debounced then flushed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "view toolbar disabled in layer mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "PgUp/PgDn layer step keeps the camera",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "leaving layer mode restores the 3D camera",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "status-bar mode chip",
+    "ok": true,
+    "detail": "'VIEW'/'MOMENT EDIT'"
+  },
+  {
+    "step": "M with panel focus toggles moment mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "0 types into the focused spin box (no zero edit)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "letters in a text field do not switch modes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Esc in a panel field keeps the mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Esc on the viewport exits the mode",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "magnetic target for drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "hover outlines the atom (open-hand cursor)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "hover clears over empty space",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "closed-hand cursor during a drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "command key F ignored mid-drag",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "axis lock held mid-drag and cleared on commit",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "drag commits exactly once after swallowed keys",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "Shift+drag on empty space pans",
+    "ok": true,
+    "detail": "focal moved 0.666"
+  },
+  {
+    "step": "save to an unwritable path shows a dialog",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "View-mode context menu: info/select only",
+    "ok": true,
+    "detail": "Atom info, Select equivalent  (E), Select all magnetic  (Ctrl+A)"
+  },
+  {
+    "step": "Moment-mode context menu: Flip / Set direction",
+    "ok": true,
+    "detail": "Flip  (F), Zero  (0), Set |m|..., Set direction..., Patterns...  (P), , Select equivalent  (E), Select all magnetic  (Ctrl+A)"
+  },
+  {
+    "step": "patterns centroid helper",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "patterns centroid needs a selection",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "step": "window geometry restored from QSettings",
+    "ok": true,
+    "detail": "expected 1360x840, got 1360x840"
+  }
+]

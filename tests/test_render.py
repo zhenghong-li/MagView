@@ -593,11 +593,10 @@ def test_configure_offscreen_only_without_display(monkeypatch):
     # os.environ -- register it with monkeypatch first so teardown cleans it up.
     monkeypatch.delenv("VTK_DEFAULT_OPENGL_WINDOW", raising=False)
     monkeypatch.setattr(pv, "OFF_SCREEN", False)
-    monkeypatch.setenv("DISPLAY", ":99")
+    monkeypatch.setattr(offscreen, "has_display", lambda: True)
     offscreen.configure_offscreen()
     assert pv.OFF_SCREEN is False  # display present: pyvista's default untouched
-    monkeypatch.delenv("DISPLAY")
-    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(offscreen, "has_display", lambda: False)
     offscreen.configure_offscreen()
     assert pv.OFF_SCREEN is True
 

@@ -12,12 +12,13 @@ os.environ.setdefault("QT_API", "pyside6")
 
 def run(path: str | None = None, screenshot: str | None = None, view: str | None = None,
         delay_ms: int = 1500) -> int:
-    """Start the GUI. With ``screenshot`` set, capture the screen to a PNG and quit
-    (used by the Xvfb smoke test; the capture includes the OpenGL viewports)."""
+    """Start the GUI. With ``screenshot`` set, capture the window to a PNG and quit
+    (used by native/Xvfb smoke tests; includes the OpenGL viewports)."""
     from PySide6.QtCore import QSettings, QTimer
     from PySide6.QtWidgets import QApplication
 
     from magview.gui.main_window import MainWindow
+    from magview.gui.capture import capture_window
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
     settings_dir = None
@@ -55,9 +56,7 @@ def run(path: str | None = None, screenshot: str | None = None, view: str | None
             win.viewport.render()
             win.reference.render()
             app.processEvents()
-            screen = win.screen()
-            pixmap = screen.grabWindow(0, win.x(), win.y(), win.frameGeometry().width(),
-                                       win.frameGeometry().height())
+            pixmap = capture_window(win)
             ok = pixmap.save(screenshot)
             print(f"screenshot {'saved' if ok else 'FAILED'}: {screenshot}")
             win.close()

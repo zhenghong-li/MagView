@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 from importlib import resources
+from magview import osdeps
 from pathlib import Path
 
 import numpy as np
@@ -37,7 +38,7 @@ class HandoffError(ValueError):
 
 
 def load_schema() -> dict:
-    with resources.files("magview.io").joinpath("handoff.schema.json").open() as fh:
+    with resources.files("magview.io").joinpath("handoff.schema.json").open(encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -286,6 +287,6 @@ def save_handoff(data: dict, path: str | Path) -> Path:
         raise HandoffError(errors)
     path = Path(path)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=1, allow_nan=False))  # strict JSON for any consumer
-    tmp.replace(path)
+    tmp.write_text(json.dumps(data, indent=1, allow_nan=False), encoding="utf-8")
+    osdeps.atomic_replace(tmp, path)
     return path

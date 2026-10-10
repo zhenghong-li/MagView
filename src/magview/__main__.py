@@ -12,6 +12,9 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
+    from magview.osdeps import configure_stdio
+
+    configure_stdio()
     from magview.render.camera import VIEWS
 
     ap = argparse.ArgumentParser(prog="magview", description=__doc__,

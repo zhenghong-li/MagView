@@ -10,8 +10,8 @@ undo/redo, canvas resize, moment drags, layer editing, stacking, export and
 magnetic-cell preview, plus robustness regressions (phase6: read-only preview
 edit guard, corrupt session files, camera preservation, focus-independent key
 handling, mid-drag key swallowing, Shift-pan, autosave recovery, save errors).
-Screenshots of the X screen are saved per step (they include the OpenGL
-viewports). Exit status 0 means every check passed; 77 means the GUI cannot
+Captures of MagView's widgets and OpenGL buffers are saved per step.
+Exit status 0 means every check passed; 77 means the GUI cannot
 start headlessly here (pytest treats it as a skip).
 """
 
@@ -40,10 +40,14 @@ def main(argv=None) -> int:
     # start empty: a previous run into the same --out would otherwise leave an autosave
     # behind, and its recovery prompt would derail this run.
     for state in ("autosave", "agentdft_jobs", "xdg_config"):
-        shutil.rmtree(out / state, ignore_errors=True)
+        target = (out / state).resolve()
+        if target.parent != out.resolve():
+            raise ValueError(f"self-test state folder escapes output directory: {target}")
+        shutil.rmtree(target, ignore_errors=True)
     os.environ["MAGVIEW_AUTOSAVE_DIR"] = str(out / "autosave")
     os.environ["MAGVIEW_AGENTDFT_DIR"] = str(out / "agentdft_jobs")
     os.environ["XDG_CONFIG_HOME"] = str(out / "xdg_config")
+    os.environ["MAGVIEW_SETTINGS_DIR"] = str(out / "xdg_config")
 
     import numpy as np
     from PySide6.QtCore import QPoint, Qt
@@ -51,6 +55,7 @@ def main(argv=None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from magview.gui.main_window import MainWindow
+    from magview.gui.capture import capture_window
     from magview.render.picking import pick_atom, project_to_display
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
@@ -85,6 +90,10 @@ def main(argv=None) -> int:
     win.raise_()
     QTest.qWaitForWindowActive(win, 3000)
     QTest.qWait(200)
+    # Windows may refuse native foreground activation when launched by a
+    # background terminal. Qt shortcuts still need an active window in the
+    # test process, even though QtTest sends keys directly to its widgets.
+    QApplication.setActiveWindow(win)
     # Probe: the QOpenGLWidget viewport cannot initialize GL on some platforms
     # (e.g. Qt's offscreen platform without GL support). Report as unavailable
     # (77) instead of crashing deeper in the checks.
@@ -110,11 +119,14 @@ def main(argv=None) -> int:
         win.viewport.render()
         win.reference.render()
         app.processEvents()
-        g = win.frameGeometry()
-        win.screen().grabWindow(0, g.x(), g.y(), g.width(), g.height()).save(str(out / f"{name}.png"))
+        capture_window(win).save(str(out / f"{name}.png"))
+        QApplication.setActiveWindow(win)
 
     def qpt(x: float, y: float) -> QPoint:
-        return QPoint(int(round(x)), int(round(widget.height() - 1 - y)))
+        # VTK display coordinates are physical pixels; QtTest uses logical pixels.
+        rw, rh = ren.GetSize()
+        return QPoint(int(round(x * widget.width() / max(1, rw))),
+                      int(round(widget.height() - 1 - y * widget.height() / max(1, rh))))
 
     model = win.scene.model
     xy = project_to_display(ren, model.atoms.cart)
@@ -165,6 +177,7 @@ def main(argv=None) -> int:
     # 4. Long press + drag = rubber band (replace selection).
     bx0, by0, bx1, by1 = w * 0.30, h * 0.30, w * 0.62, h * 0.66
     QTest.mousePress(widget, Qt.LeftButton, Qt.NoModifier, qpt(bx0, by0))
+    actual_start = win.editor.style.GetInteractor().GetEventPosition()
     QTest.qWait(500)  # long press arms the box
     armed = win.editor.machine.state.name == "BOX"
     for k in range(1, 9):
@@ -172,8 +185,9 @@ def main(argv=None) -> int:
         QTest.qWait(5)
     shot("02_box_dragging")
     QTest.mouseRelease(widget, Qt.LeftButton, Qt.NoModifier, qpt(bx1, by1))
+    actual_end = win.editor.style.GetInteractor().GetEventPosition()
     QTest.qWait(50)
-    expected = set(win.editor.sites_in_box(bx0, by0, bx1, by1))
+    expected = set(win.editor.sites_in_box(*actual_start, *actual_end))
     check("long-press arms box", armed)
     check("box selects sites inside", len(expected) > 2 and win.selection == expected,
           f"{len(win.selection)} selected, {len(expected)} expected")
@@ -228,7 +242,7 @@ def main(argv=None) -> int:
         phase5_checks(win, widget, check, shot, qpt, out)
         phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, args.file)
 
-    (out / "selftest.json").write_text(json.dumps(results, indent=2))
+    (out / "selftest.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     win.close()
     return 0 if all(r["ok"] for r in results) else 1
 
@@ -298,8 +312,10 @@ def phase2_checks(win, widget, check, shot, qpt) -> None:
                              centered=win.scene.arrow_style.centered)
         from magview.render.picking import display_ray
 
-        # Qt delivers integer pixels: evaluate at the pixel actually sent.
-        o, d = display_ray(ren, round(x1), round(y1))
+        # Qt rounds to logical pixels, then VTK scales to physical pixels. At
+        # high DPI the delivered endpoint can differ from round(x1), round(y1).
+        actual_x, actual_y = win.editor.style.GetInteractor().GetEventPosition()
+        o, d = display_ray(ren, actual_x, actual_y)
         return mg.drag_moment(frame, mg.plane_point(frame, o, d), lock=lock, collinear_axis=axis)
 
     disp, site, x, y = magnetic_target()
@@ -868,15 +884,27 @@ def phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, src) -> Non
     check("magnetic target for drag", t is not None)
     if t is not None:
         disp, site, x, y = t
-        QTest.mouseMove(widget, qpt(x, y))
-        QTest.qWait(60)
+        # QTest.mouseMove without a pressed button can move the *desktop* cursor
+        # instead of delivering an event on Windows (another app may cover us).
+        # Send an actual Qt hover motion to the widget, still through the VTK
+        # event bridge, without depending on foreground ownership.
+        from PySide6.QtCore import QEvent, QPointF
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtWidgets import QApplication
+
+        def hover_at(point):
+            event = QMouseEvent(QEvent.MouseMove, QPointF(point),
+                                QPointF(widget.mapToGlobal(point)),
+                                Qt.NoButton, Qt.NoButton, Qt.NoModifier)
+            QApplication.sendEvent(widget, event)
+
+        hover_at(qpt(x, y))
         check("hover outlines the atom (open-hand cursor)",
               win.editor._hover_site == site
               and win.viewport.cursor().shape() == Qt.OpenHandCursor)
         ep0 = empty_point()
         if ep0 is not None:
-            QTest.mouseMove(widget, qpt(*ep0))
-            QTest.qWait(60)
+            hover_at(qpt(*ep0))
             check("hover clears over empty space", win.editor._hover_site is None)
         before, n_hist = doc.moments.copy(), len(doc.history._undo)
         QTest.mousePress(widget, Qt.LeftButton, Qt.NoModifier, qpt(x, y))

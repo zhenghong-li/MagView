@@ -2,12 +2,14 @@
 
 import os
 import subprocess
+import sys
 
 import pytest
 
 from conftest import SETUP_SCRIPT
 
 LIST_FILE = SETUP_SCRIPT.parent / "system-packages.txt"
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux apt system dependencies")
 
 
 def run(*args):
@@ -37,7 +39,7 @@ def test_check_reports_complete():
     assert "all" in proc.stdout
 
 
-@pytest.mark.skipif(os.geteuid() != 0, reason="install mode needs root")
+@pytest.mark.skipif(getattr(os, "geteuid", lambda: -1)() != 0, reason="install mode needs root")
 def test_install_is_idempotent_noop():
     proc = run()
     assert proc.returncode == 0, proc.stderr
