@@ -119,6 +119,10 @@ class LayerPanel(QWidget):
         self.up_btn.clicked.connect(lambda: self.set_selected.emit(1))
         self.down_btn.clicked.connect(lambda: self.set_selected.emit(-1))
         self.candidate_buttons: list[_HoverButton] = []
+        # Content signatures: unchanged content skips widget rebuilds (hover previews
+        # refresh the panel every move; delete/recreate flickers).
+        self._match_sig: tuple | None = None
+        self._stack_sig: tuple | None = None
 
     def set_layers(self, labels: list[str], current: int) -> None:
         self.layers.blockSignals(True)
@@ -134,6 +138,12 @@ class LayerPanel(QWidget):
         self.layers.blockSignals(False)
 
     def set_match(self, lattice_text: str, result: MatchResult) -> None:
+        sig = (lattice_text, result.status, result.reason,
+               tuple((c.pattern.label, c.explanation) for c in result.candidates),
+               tuple((e.pattern.label, e.reason) for e in result.excluded))
+        if sig == self._match_sig:
+            return  # identical content: keep the existing buttons (no flicker)
+        self._match_sig = sig
         self.lattice.setText(f"<b>Lattice:</b> {lattice_text}")
         for b in self.candidate_buttons:
             self.cand_box.removeWidget(b)
@@ -156,6 +166,17 @@ class LayerPanel(QWidget):
             self.excluded.setText("")
 
     def set_stacking(self, element: str, n_layers: int, ref: Reference, match: StackingMatch | None) -> None:
+        if not ref.ok:
+            sig = (element, n_layers, False, ref.reason)
+        else:
+            rels = tuple(match.relations) if match else ()
+            sig = (element, n_layers, True, rels, match.status, match.reason,
+                   tuple(sorted(p.key for p in match.candidates)),
+                   tuple(sorted((p.key, r) for p, r in match.excluded)),
+                   tuple((p.key, p.label, invalid) for p, invalid in stacking_library(len(rels))))
+        if sig == self._stack_sig:
+            return  # identical content: keep the existing buttons (no flicker)
+        self._stack_sig = sig
         for b in self.stack_buttons.values():
             self.stack_buttons_box.removeWidget(b)
             b.deleteLater()

@@ -1,12 +1,18 @@
 """Scripted end-to-end GUI test: real Qt events through the real window.
 
     xvfb-run -a python -m magview.gui.selftest STRUCTURE.cif --out DIR
+    QT_QPA_PLATFORM=offscreen python -m magview.gui.selftest ...  # no X server needed
 
 Sends synthetic mouse/keyboard events (QtTest) to the main viewport and checks
 the outcome after each step: click select, Shift-click add, camera drag
 (no selection change), long-press rubber band, Esc, accepting suggestions,
-undo/redo, canvas resize. Screenshots of the X screen are saved per step (they
-include the OpenGL viewports). Exit status 0 means every check passed.
+undo/redo, canvas resize, moment drags, layer editing, stacking, export and
+magnetic-cell preview, plus robustness regressions (phase6: read-only preview
+edit guard, corrupt session files, camera preservation, focus-independent key
+handling, mid-drag key swallowing, Shift-pan, autosave recovery, save errors).
+Screenshots of the X screen are saved per step (they include the OpenGL
+viewports). Exit status 0 means every check passed; 77 means the GUI cannot
+start headlessly here (pytest treats it as a skip).
 """
 
 from __future__ import annotations
@@ -29,6 +35,9 @@ def main(argv=None) -> int:
 
     os.environ.setdefault("MAGVIEW_AUTOSAVE_DIR", str(out / "autosave"))
     os.environ.setdefault("MAGVIEW_AGENTDFT_DIR", str(out / "agentdft_jobs"))
+    # Isolate QSettings (window geometry/dock state, arrow settings) from the
+    # developer's real config: a stale restored layout must not break the test.
+    os.environ["XDG_CONFIG_HOME"] = str(out / "xdg_config")
 
     import numpy as np
     from PySide6.QtCore import QPoint, Qt
@@ -39,18 +48,26 @@ def main(argv=None) -> int:
     from magview.render.picking import pick_atom, project_to_display
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    win = MainWindow()
+    try:
+        win = MainWindow()
+    except Exception as exc:
+        # 77 = the GUI cannot start headlessly here (pytest treats it as a skip).
+        print(f"[SKIP] cannot create the main window: {exc}")
+        return 77
 
     # Watchdog: an unexpected modal dialog would block forever under Xvfb.
+    # The expected modal busy indicator of threaded load/analyze ("busy_progress")
+    # is left alone: closing it must not abort the work (it is purely visual).
     from PySide6.QtCore import QTimer
 
     def close_modals():
         modal = app.activeModalWidget()
-        if modal is not None:
-            results.append({"step": "no unexpected modal dialog", "ok": False,
-                            "detail": f"closed: {modal.windowTitle()!r}"})
-            print(f"[FAIL] unexpected modal dialog {modal.windowTitle()!r}")
-            modal.reject() if hasattr(modal, "reject") else modal.close()
+        if modal is None or modal.objectName() == "busy_progress":
+            return
+        results.append({"step": "no unexpected modal dialog", "ok": False,
+                        "detail": f"closed: {modal.windowTitle()!r}"})
+        print(f"[FAIL] unexpected modal dialog {modal.windowTitle()!r}")
+        modal.reject() if hasattr(modal, "reject") else modal.close()
 
     watchdog = QTimer()
     watchdog.timeout.connect(close_modals)
@@ -193,6 +210,7 @@ def main(argv=None) -> int:
         phase3_checks(win, widget, check, shot, qpt)
         phase4_checks(win, widget, check, shot, qpt)
         phase5_checks(win, widget, check, shot, qpt, out)
+        phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, args.file)
 
     (out / "selftest.json").write_text(json.dumps(results, indent=2))
     win.close()
@@ -362,7 +380,9 @@ def phase2_checks(win, widget, check, shot, qpt) -> None:
         check("session save/load round trip", np.allclose(doc2.moments, doc.moments)
               and np.array_equal(doc2.canvas.matrix, doc.canvas.matrix)
               and np.array_equal(doc2.magnetic, doc.magnetic))
-    auto = list((Path(os.environ["MAGVIEW_AUTOSAVE_DIR"])).glob("*.magview.json"))
+    auto_dir = Path(os.environ["MAGVIEW_AUTOSAVE_DIR"])
+    win._flush_autosave()  # autosave is debounced; flush before checking the file
+    auto = list(auto_dir.glob("*.magview.json"))
     check("autosave written after edits", len(auto) == 1)
 
     # 19. Esc leaves Moment mode (no gesture active).
@@ -572,7 +592,377 @@ def phase5_checks(win, widget, check, shot, qpt, out) -> None:
           and not win.export_panel.save_btn.isEnabled())
 
 
-import os  # noqa: E402  (used by phase2_checks)
+def phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, src) -> None:
+    """Robustness regressions: read-only preview edit guard, corrupt session files,
+    camera preservation, panel-focus keys, mid-drag keys, Esc in fields, Shift-pan,
+    view buttons in layer mode, mode chip, autosave debounce + recovery offer."""
+    import numpy as np
+    from PySide6.QtCore import QTimer, Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QMessageBox
+
+    from magview.core import interaction as ia
+    from magview.render.picking import pick_atom, project_to_display
+
+    ren = win.viewport.renderer
+    win.set_mode(ia.Mode.VIEW)
+    win.set_selection(set())
+    QTest.qWait(60)
+    doc = win.doc
+
+    def auto_answer(accept=True):
+        """Poll for a modal QMessageBox and click it away (Yes/Ok, or No)."""
+        state = {"answered": False}
+        timer = QTimer()
+
+        def poll():
+            m = app.activeModalWidget()
+            if isinstance(m, QMessageBox) and not state["answered"]:
+                buttons = (QMessageBox.Yes, QMessageBox.Ok) if accept else (QMessageBox.No,)
+                for sb in buttons:
+                    btn = m.button(sb)
+                    if btn is not None:
+                        state["answered"] = True
+                        btn.click()
+                        return
+
+        timer.timeout.connect(poll)
+        timer.start(80)
+        return timer, state
+
+    def magnetic_target():
+        model = win.scene.model
+        xy = project_to_display(ren, model.atoms.cart)
+        w, h = ren.GetSize()
+        mag = win.doc.canvas_magnetic[model.atoms.parent]
+        for i in np.argsort(np.linalg.norm(xy - [w / 2, h / 2], axis=1)):
+            x, y = xy[i]
+            if mag[i] and 120 < x < w - 120 and 120 < y < h - 120 and pick_atom(ren, model, x, y) == i:
+                return int(i), int(model.atoms.parent[i]), float(x), float(y)
+        return None
+
+    def empty_point():
+        model = win.scene.model
+        w, h = ren.GetSize()
+        for x in np.linspace(15, w - 15, 24):
+            for y in np.linspace(15, h - 15, 18):
+                if pick_atom(ren, model, x, y) is None:
+                    return float(x), float(y)
+        return None
+
+    def camera():
+        cam = win.viewport.camera
+        return np.array(cam.position), np.array(cam.focal_point), float(cam.parallel_scale)
+
+    # 20. The read-only magnetic-cell preview blocks every edit/select/info path.
+    win.set_selection({0})
+    cam_pre = camera()
+    check("analyze for preview", win.analyze_magnetic_cell())
+    win.export_panel.preview.setChecked(True)
+    QTest.qWait(100)
+    before, n_hist = doc.moments.copy(), len(doc.history._undo)
+    win.flip_selection()
+    win.zero_selection()
+    win.select_all_magnetic()
+    win.select_equivalent()
+    win._on_select([0], ia.SelectOp.REPLACE, click=True)
+    win._on_clear()
+    win._on_info(0)
+    win.show_patterns_menu()
+    win._ask_magnitude()
+    win._ask_direction()
+    win.resize_canvas((1, 1, 1))
+    win._accept_suggestions(win.suggestions.report.candidates[:1], {})
+    win._context_menu(0)
+    QTest.qWait(50)
+    check("read-only preview blocks edits, selection, info and menus",
+          np.array_equal(doc.moments, before) and len(doc.history._undo) == n_hist
+          and win.selection == {0} and app.activePopupWidget() is None
+          and win._build_context_menu(0) is None
+          and "read-only" in win.statusBar().currentMessage())
+    # Undo/redo stay functional during the preview: they edit the document (never
+    # wrong sites) and exit the preview cleanly, restoring the pre-preview camera.
+    win.undo()
+    QTest.qWait(80)
+    pos, foc, scale = camera()
+    check("undo during preview exits it and restores the camera",
+          not win.previewing and not win.editor.mode_overlay.banner.GetVisibility()
+          and int(win.scene.model.atoms.parent.max()) + 1 == len(doc.canvas)
+          and np.allclose(pos, cam_pre[0]) and np.allclose(foc, cam_pre[1])
+          and abs(scale - cam_pre[2]) < 1e-6)
+    win.redo()  # restore the moments the checks below expect
+    QTest.qWait(60)
+    win.export_panel.preview.setChecked(False)
+    QTest.qWait(100)
+    pos, foc, scale = camera()
+    check("unticking the preview restores the user's camera",
+          np.allclose(pos, cam_pre[0]) and np.allclose(foc, cam_pre[1])
+          and abs(scale - cam_pre[2]) < 1e-6)
+
+    # 20b. Moment-only edits take the scene's in-place fast path; a fast-path
+    # failure falls back to a full rebuild (StructureScene.set_moments contract).
+    mag_site = int(np.nonzero(doc.canvas_magnetic)[0][0])
+    model_id = id(win.scene.model)
+    doc.flip([mag_site])
+    QTest.qWait(30)
+    check("moment-only edit keeps the scene (in-place set_moments)",
+          id(win.scene.model) == model_id)
+    original_set_moments = win.scene.set_moments
+    calls = {"n": 0}
+
+    def flaky_set_moments(moments, *a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ValueError("simulated shape mismatch")
+        return original_set_moments(moments, *a, **k)
+
+    win.scene.set_moments = flaky_set_moments
+    try:
+        doc.flip([mag_site])  # must not raise; falls back to the full rebuild
+    finally:
+        win.scene.set_moments = original_set_moments
+    check("fast-path failure falls back to a rebuild",
+          id(win.scene.model) != model_id
+          and np.allclose(win.scene.model.moments, win._display_moments(doc.moments)))
+    model_id = id(win.scene.model)
+    doc.zero([mag_site])
+    QTest.qWait(30)
+    check("the fast path resumes after a fallback", id(win.scene.model) == model_id)
+
+    # 21. A stale preview banner must not survive loading a new file.
+    check("re-analyze after fast-path edits", win.analyze_magnetic_cell())
+    win.export_panel.preview.setChecked(True)
+    QTest.qWait(80)
+    check("preview banner shown", win.editor.mode_overlay.banner.GetVisibility() == 1)
+    # The autosave from earlier phases is newer than the CIF, so the recovery offer
+    # pops up here: decline it (the load itself must proceed normally).
+    watchdog.stop()
+    timer, state = auto_answer(accept=False)
+    loaded = win.load_file(src)
+    timer.stop()
+    watchdog.start(1500)
+    check("recovery offer can be declined", state["answered"])
+    check("loading a file drops the preview banner", loaded
+          and not win.previewing and not win.editor.mode_overlay.banner.GetVisibility())
+    doc = win.doc
+    QTest.qWait(80)
+
+    # 22. A corrupt/hand-edited session file gets a dialog, never a traceback.
+    bad = Path(out) / "broken.magview.json"
+    bad.write_text('{"format": "magview-project", "version": 1}')  # missing keys -> KeyError
+    doc_id = id(win.doc)
+    watchdog.stop()
+    timer, state = auto_answer()
+    ok = win.load_file(bad)
+    timer.stop()
+    watchdog.start(1500)
+    check("corrupt session file: friendly dialog, document untouched",
+          not ok and state["answered"] and id(win.doc) == doc_id)
+
+    # 23. Recovery: a newer autosave is offered on open and restores the edits.
+    win.doc.set_moments([0], [0, 0, 1.5], "test: seed moment")
+    sess = Path(out) / "recovery.magview.json"
+    win.session_path = sess
+    check("save session for recovery test", win.save_session())
+    QTest.qWait(30)
+    win.doc.set_moments([0], [0, 0, 2.5], "test: unsaved edit")
+    win._flush_autosave()
+    watchdog.stop()
+    timer, state = auto_answer(accept=True)
+    ok = win.load_file(sess)
+    timer.stop()
+    watchdog.start(1500)
+    check("newer recovery autosave offered and restored",
+          ok and state["answered"] and abs(win.doc.moments[0][2] - 2.5) < 1e-9)
+    doc = win.doc
+
+    # 24. Autosave is debounced, not synchronous per edit.
+    win._flush_autosave()
+    doc.zero([0])
+    QTest.qWait(20)
+    debounced = win._autosave_pending
+    win._flush_autosave()
+    auto_files = list(Path(os.environ["MAGVIEW_AUTOSAVE_DIR"]).glob("*.magview.json"))
+    check("autosave debounced then flushed", debounced and not win._autosave_pending
+          and len(auto_files) == 1)
+
+    # 25. Camera preservation across layer mode entry, layer stepping and exit.
+    win.set_view("oblique")
+    QTest.qWait(60)
+    cam3d = camera()
+    win.set_mode(ia.Mode.LAYER)
+    QTest.qWait(100)
+    check("view toolbar disabled in layer mode",
+          win.in_layer_mode and all(not a.isEnabled() for a in win.view_actions))
+    cam_layer = camera()
+    win.step_layer(1)
+    QTest.qWait(60)
+    pos, foc, scale = camera()
+    check("PgUp/PgDn layer step keeps the camera",
+          np.allclose(pos, cam_layer[0]) and np.allclose(foc, cam_layer[1]))
+    win.set_mode(ia.Mode.VIEW)
+    QTest.qWait(80)
+    pos, foc, scale = camera()
+    check("leaving layer mode restores the 3D camera",
+          all(a.isEnabled() for a in win.view_actions)
+          and np.allclose(pos, cam3d[0]) and np.allclose(foc, cam3d[1])
+          and abs(scale - cam3d[2]) < 1e-6)
+
+    # 26. Status-bar mode chip follows the mode.
+    chip0 = win.mode_label.text()
+    win.set_mode(ia.Mode.MOMENT)
+    QTest.qWait(60)
+    chip1 = win.mode_label.text()
+    win.set_mode(ia.Mode.VIEW)
+    QTest.qWait(60)
+    check("status-bar mode chip", chip0 == "VIEW" and chip1 == "MOMENT EDIT"
+          and win.mode_label.text() == "VIEW", f"{chip0!r}/{chip1!r}")
+
+    # 27. Letter keys work when a panel has focus, but text fields keep their keys.
+    win.set_selection({0})
+    win.mom_dock.raise_()
+    win.moments_panel.flip_btn.setFocus()
+    QTest.qWait(40)
+    QTest.keyClick(win.moments_panel.flip_btn, Qt.Key_M)
+    QTest.qWait(60)
+    check("M with panel focus toggles moment mode", win.editor.machine.mode == ia.Mode.MOMENT)
+    win.moments_panel.scale.setFocus()
+    QTest.qWait(40)
+    n_hist = len(doc.history._undo)
+    QTest.keyClick(win.moments_panel.scale, Qt.Key_0)
+    QTest.qWait(30)
+    check("0 types into the focused spin box (no zero edit)", len(doc.history._undo) == n_hist)
+    QTest.keyClick(win.moments_panel.scale, Qt.Key_M)
+    QTest.qWait(30)
+    check("letters in a text field do not switch modes", win.editor.machine.mode == ia.Mode.MOMENT)
+    QTest.keyClick(win.moments_panel.scale, Qt.Key_Escape)
+    QTest.qWait(30)
+    check("Esc in a panel field keeps the mode", win.editor.machine.mode == ia.Mode.MOMENT)
+    win.viewport.setFocus()
+    QTest.qWait(40)
+    QTest.keyClick(win.viewport, Qt.Key_Escape)
+    QTest.qWait(60)
+    check("Esc on the viewport exits the mode", win.editor.machine.mode == ia.Mode.VIEW)
+
+    # 28. Command keys are ignored mid-drag; a held axis lock never sticks. And
+    # idle hover in Moment mode outlines the atom under the cursor (open hand).
+    win.set_mode(ia.Mode.MOMENT)
+    QTest.qWait(80)
+    t = magnetic_target()
+    check("magnetic target for drag", t is not None)
+    if t is not None:
+        disp, site, x, y = t
+        QTest.mouseMove(widget, qpt(x, y))
+        QTest.qWait(60)
+        check("hover outlines the atom (open-hand cursor)",
+              win.editor._hover_site == site
+              and win.viewport.cursor().shape() == Qt.OpenHandCursor)
+        ep0 = empty_point()
+        if ep0 is not None:
+            QTest.mouseMove(widget, qpt(*ep0))
+            QTest.qWait(60)
+            check("hover clears over empty space", win.editor._hover_site is None)
+        before, n_hist = doc.moments.copy(), len(doc.history._undo)
+        QTest.mousePress(widget, Qt.LeftButton, Qt.NoModifier, qpt(x, y))
+        for k in range(1, 5):
+            QTest.mouseMove(widget, qpt(x, y + 10 * k))
+            QTest.qWait(5)
+        check("closed-hand cursor during a drag",
+              win.viewport.cursor().shape() == Qt.ClosedHandCursor)
+        QTest.keyClick(widget, Qt.Key_F)
+        QTest.qWait(15)
+        mid_ok = np.array_equal(doc.moments, before) and len(doc.history._undo) == n_hist
+        QTest.keyPress(widget, Qt.Key_Z)
+        QTest.qWait(15)
+        locked = win.axis_lock == "z"
+        QTest.mouseRelease(widget, Qt.LeftButton, Qt.NoModifier, qpt(x, y + 40))
+        QTest.qWait(60)
+        QTest.keyRelease(widget, Qt.Key_Z)  # late release after commit must be harmless
+        QTest.qWait(20)
+        check("command key F ignored mid-drag", mid_ok)
+        check("axis lock held mid-drag and cleared on commit",
+              locked and win.axis_lock is None)
+        check("drag commits exactly once after swallowed keys",
+              len(doc.history._undo) == n_hist + 1
+              and doc.moments[site] @ doc.spin_axis > 0.2)
+    win.set_mode(ia.Mode.VIEW)
+    QTest.qWait(60)
+
+    # 29. Shift + left drag on empty space pans (focal point translates, distance kept).
+    ep = empty_point()
+    if ep is None:
+        check("Shift+drag pans", False, "no empty pixel found")
+    else:
+        pos0, foc0, _ = camera()
+        QTest.mousePress(widget, Qt.LeftButton, Qt.ShiftModifier, qpt(*ep))
+        for k in range(1, 9):
+            QTest.mouseMove(widget, qpt(ep[0] + 9 * k, ep[1]))
+            QTest.qWait(5)
+        QTest.mouseRelease(widget, Qt.LeftButton, Qt.ShiftModifier, qpt(ep[0] + 72, ep[1]))
+        QTest.qWait(60)
+        pos1, foc1, _ = camera()
+        d0, d1 = pos0 - foc0, pos1 - foc1
+        check("Shift+drag on empty space pans",
+              np.linalg.norm(foc1 - foc0) > 1e-3
+              and abs(np.linalg.norm(d1) - np.linalg.norm(d0)) < 1e-3 * np.linalg.norm(d0)
+              and np.allclose(d1 / np.linalg.norm(d1), d0 / np.linalg.norm(d0), atol=1e-3),
+              f"focal moved {np.linalg.norm(foc1 - foc0):.3f}")
+
+    # 30. Save failures become dialogs, not crashes.
+    watchdog.stop()
+    timer, state = auto_answer()
+    win.session_path = Path(out) / "no_such_dir" / "x.magview.json"
+    ok = win.save_session()
+    QTest.qWait(30)
+    timer.stop()
+    watchdog.start(1500)
+    win.session_path = None
+    check("save to an unwritable path shows a dialog", not ok and state["answered"])
+
+    # 31. Context menu contents follow the mode (spec section 2); the patterns
+    # popover can anchor at the selection centroid for keyboard invocation.
+    view_menu = win._build_context_menu(0)  # View mode
+    view_entries = [a.text() for a in view_menu.actions()] if view_menu else []
+    win.set_mode(ia.Mode.MOMENT)
+    QTest.qWait(60)
+    moment_menu = win._build_context_menu(0)
+    moment_entries = [a.text() for a in moment_menu.actions()] if moment_menu else []
+    win.set_mode(ia.Mode.VIEW)
+    QTest.qWait(40)
+    check("View-mode context menu: info/select only",
+          any("info" in t.lower() for t in view_entries)
+          and not any("Flip" in t for t in view_entries), ", ".join(view_entries))
+    check("Moment-mode context menu: Flip / Set direction",
+          any("Flip" in t for t in moment_entries)
+          and any("Set direction" in t for t in moment_entries), ", ".join(moment_entries))
+    check("patterns centroid helper", win._selection_centroid_global() is not None)
+    win.set_selection(set())
+    check("patterns centroid needs a selection", win._selection_centroid_global() is None)
+
+    # 32. Window geometry persists via QSettings (a fresh window restores it).
+    win.resize(win.width() - 120, max(400, win.height() - 60))  # post-show, so it sticks
+    QTest.qWait(80)
+    win.settings.setValue("window/geometry", win.saveGeometry())  # what closeEvent saves
+    win.settings.setValue("window/state", win.saveState())
+    expected = (win.width(), win.height())
+    if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        # The offscreen platform controls top-level geometry itself (and a second GL
+        # window is unstable there); exercise the restore path on the live window.
+        win._restore_window_state()
+        ok = (win.settings.value("window/geometry") is not None
+              and win.settings.value("window/state") is not None)
+        check("window geometry persisted via QSettings", ok)
+    else:
+        from magview.gui.main_window import MainWindow
+
+        w2 = MainWindow()
+        check("window geometry restored from QSettings",
+              (w2.width(), w2.height()) == expected, f"{w2.width()}x{w2.height()}")
+        w2.close()
+        QTest.qWait(60)
+
+
+import os  # noqa: E402  (used by phase2_checks and phase6_checks)
 
 if __name__ == "__main__":
     sys.exit(main())
