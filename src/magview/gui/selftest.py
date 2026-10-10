@@ -56,8 +56,10 @@ def main(argv=None) -> int:
 
     from magview.gui.main_window import MainWindow
     from magview.gui.capture import capture_window
+    from magview.gui.qt_compat import configure_surface_format
     from magview.render.picking import pick_atom, project_to_display
 
+    configure_surface_format()
     app = QApplication.instance() or QApplication(sys.argv[:1])
     try:
         win = MainWindow()
@@ -951,6 +953,48 @@ def phase6_checks(win, widget, check, shot, qpt, out, app, watchdog, src) -> Non
               and abs(np.linalg.norm(d1) - np.linalg.norm(d0)) < 1e-3 * np.linalg.norm(d0)
               and np.allclose(d1 / np.linalg.norm(d1), d0 / np.linalg.norm(d0), atol=1e-3),
               f"focal moved {np.linalg.norm(foc1 - foc0):.3f}")
+
+    # Native trackpad events must reach an embedded QtInteractor (pyvistaqt's
+    # BackgroundPlotter wires gestures on its own window; we do not use that).
+    from magview import osdeps
+
+    if osdeps.native_gui_workarounds():
+        from PySide6.QtCore import QPoint, QPointF
+        from PySide6.QtGui import QNativeGestureEvent, QPointingDevice, QWheelEvent
+
+        cam = win.viewport.camera
+        saved_camera = win.viewport.camera_position
+        saved_scale = cam.GetParallelScale()
+        selected = win.selection
+        moments = win.doc.moments.copy()
+
+        def zoom_size():
+            return cam.GetParallelScale() if cam.GetParallelProjection() else cam.GetDistance()
+
+        local = QPointF(widget.rect().center())
+        global_pos = QPointF(widget.mapToGlobal(widget.rect().center()))
+
+        def scroll(delta):
+            event = QWheelEvent(local, global_pos, QPoint(0, delta), QPoint(0, 0),
+                                Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+            app.sendEvent(widget, event)
+
+        before = zoom_size()
+        scroll(1)
+        after = zoom_size()
+        check("trackpad pixel scroll zooms smoothly", before * 0.99 < after < before)
+        scroll(-1)
+        check("opposite trackpad steps restore zoom", abs(zoom_size() - before) < before * 1e-8)
+        pinch = QNativeGestureEvent(Qt.ZoomNativeGesture, QPointingDevice.primaryPointingDevice(), 2,
+                                   local, local, global_pos, 0.1, QPointF())
+        app.sendEvent(widget, pinch)
+        check("native pinch reaches the embedded viewport",
+              abs(zoom_size() - before / 1.1) < before * 1e-8)
+        check("trackpad zoom preserves selection and moments",
+              win.selection == selected and np.array_equal(win.doc.moments, moments))
+        win.viewport.camera_position = saved_camera
+        cam.SetParallelScale(saved_scale)
+        win.viewport.render()
 
     # 30. Save failures become dialogs, not crashes.
     watchdog.stop()

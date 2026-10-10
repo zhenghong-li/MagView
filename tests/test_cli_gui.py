@@ -57,7 +57,9 @@ def test_gui_selftest(tmp_path, name):
         [*gui_command(), "-m",
          "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(tmp_path)], timeout=300,
         env=gui_env())
-    results = json.loads((tmp_path / "selftest.json").read_text())
+    results_file = tmp_path / "selftest.json"
+    assert results_file.is_file(), proc.stdout + proc.stderr
+    results = json.loads(results_file.read_text())
     failed = [r for r in results if not r["ok"]]
     assert proc.returncode == 0 and not failed, proc.stdout + proc.stderr
     assert len(results) >= 12

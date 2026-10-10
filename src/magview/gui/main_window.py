@@ -51,7 +51,6 @@ from PySide6.QtWidgets import (  # noqa: E402
     QVBoxLayout,
     QWidget,
 )
-from pyvistaqt import QtInteractor  # noqa: E402
 
 from magview import __version__, osdeps  # noqa: E402
 from magview.core import interaction as ia  # noqa: E402
@@ -75,6 +74,10 @@ from magview.io.handoff import HandoffError, build_handoff, save_handoff  # noqa
 from magview.gui.panels.moment_panel import MomentPanel  # noqa: E402
 from magview.gui.panels.suggestion_panel import SuggestionPanel  # noqa: E402
 from magview.gui.viewport import EditorViewport, ViewportCallbacks  # noqa: E402
+from magview.gui.qt_compat import (  # noqa: E402
+    ViewportInteractor, configure_surface_format,
+)
+from magview.gui.shortcuts import command_modifier_text, shortcut_text  # noqa: E402
 from magview.render.arrows import ArrowStyle  # noqa: E402
 from magview.render.camera import VIEWS  # noqa: E402
 from magview.render.layer_view import UNSET_RGB, LayerScene  # noqa: E402
@@ -104,7 +107,7 @@ SHORTCUT_REFERENCE = (
         ("Left-drag", "rotate"),
         ("Middle-drag, Shift+drag on empty space", "pan"),
         ("Wheel, right-drag", "zoom"),
-        ("Click", "select an atom (Shift adds, Ctrl toggles; empty space clears)"),
+        ("Click", f"select an atom (Shift adds, {command_modifier_text()} toggles; empty space clears)"),
         ("Long-press 0.35 s, then drag", "box select (or press B, then drag)"),
         ("Right-click", "context menu (Moment mode: edits; Layer mode: unset the site)"),
     )),
@@ -112,7 +115,7 @@ SHORTCUT_REFERENCE = (
         ("F, 0", "flip / zero the selected moments"),
         ("P", "FM/AFM patterns that fit the selection"),
         ("E", "select symmetry-equivalent sites"),
-        ("Ctrl+A", "select all magnetic sites"),
+        (shortcut_text("Ctrl+A"), "select all magnetic sites"),
     )),
     ("While dragging a moment", (
         ("Hold X / Y / Z / A / B / C", "lock to that Cartesian or lattice axis"),
@@ -124,8 +127,10 @@ SHORTCUT_REFERENCE = (
         ("PgUp, PgDown", "previous / next layer"),
     )),
     ("Edit and files", (
-        ("Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z", "undo, redo"),
-        ("Ctrl+O, Ctrl+S, Ctrl+Shift+S", "open, save session, save session as"),
+        (f"{shortcut_text('Ctrl+Z')}, {shortcut_text('Ctrl+Y')} / {shortcut_text('Ctrl+Shift+Z')}",
+         "undo, redo"),
+        (f"{shortcut_text('Ctrl+O')}, {shortcut_text('Ctrl+S')}, {shortcut_text('Ctrl+Shift+S')}",
+         "open, save session, save session as"),
         ("F1", "this reference"),
     )),
 )
@@ -198,7 +203,7 @@ class _BusyInputBlocker(QObject):
     BLOCKED = frozenset({QEvent.MouseButtonPress, QEvent.MouseButtonRelease,
                          QEvent.MouseButtonDblClick, QEvent.KeyPress, QEvent.KeyRelease,
                          QEvent.Wheel, QEvent.ContextMenu, QEvent.Shortcut,
-                         QEvent.ShortcutOverride})
+                         QEvent.ShortcutOverride, QEvent.NativeGesture})
 
     def __init__(self, window: QWidget) -> None:
         super().__init__(window)
@@ -325,6 +330,7 @@ class MainWindow(QMainWindow):
         """``settings``: where the window layout and arrow settings persist (default: the
         user's QSettings). ``autosave=False`` disables recovery autosaves and the
         restore prompt (batch/capture runs)."""
+        configure_surface_format()
         super().__init__()
         self.appearance = appearance or Appearance.load()
         self.doc: MagDocument | None = None
@@ -360,14 +366,14 @@ class MainWindow(QMainWindow):
         # Main 3D view: the editing canvas. No auto_update: pyvistaqt's default re-renders
         # both views 5x per second forever (2-4 CPU cores busy on an idle window with
         # software GL); every scene change here renders explicitly instead.
-        self.viewport = QtInteractor(self, auto_update=False)
+        self.viewport = ViewportInteractor(self, auto_update=False)
         self.setCentralWidget(self.viewport.interactor)
         self.scene = StructureScene(self.viewport, self.appearance.theme)
         self.editor = EditorViewport(self.viewport, self.scene, ViewportCallbacks(
             select=self._on_select, clear=self._on_clear, info=self._on_info,
             mode_changed=self._on_mode_changed, drag=self._on_drag,
             context_menu=self._context_menu), self.appearance.theme)
-        self.cursor_label = CursorLabel(self.viewport.renderer)
+        self.cursor_label = CursorLabel(self.viewport.renderer, pixel_ratio=self.editor.pixel_ratio)
         self.layer_scene = LayerScene(self.viewport, self.appearance.theme)
         self._keys = _ViewportKeys(self)
         app = QApplication.instance()
@@ -380,7 +386,7 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._flush_autosave)
 
         # Right dock: reference view of the full input cell + structure info.
-        self.reference = QtInteractor(self, auto_update=False)
+        self.reference = ViewportInteractor(self, auto_update=False)
         self.reference.setMinimumSize(280, 240)
         self.reference.iren.clear_key_event_callbacks()
         self.ref_scene = StructureScene(self.reference, self.appearance.theme, show_axes=False)
@@ -446,7 +452,7 @@ class MainWindow(QMainWindow):
         self._load_arrow_settings()
         self._set_mode_chip(ia.Mode.VIEW)
         self._restore_window_state()
-        self.statusBar().showMessage("Open a structure or session: File > Open (Ctrl+O).   "
+        self.statusBar().showMessage(f"Open a structure or session: File > Open ({shortcut_text('Ctrl+O')}).   "
                                      "F1: keyboard and mouse reference.   "
                                      f"Appearance: {self.appearance.source}")
 
@@ -485,6 +491,7 @@ class MainWindow(QMainWindow):
                           triggered=lambda: self.save_session(ask=True))
         shot_act = QAction("Save &image...", self, triggered=self.save_image_dialog)
         quit_act = QAction("&Quit", self, shortcut=QKeySequence.Quit, triggered=self.close)
+        quit_act.setMenuRole(QAction.QuitRole)
         handoff_act = QAction("Export AgentDFT &handoff...", self,
                               triggered=lambda: self.save_handoff_dialog())
         file_menu.addActions([open_act, self.save_act, save_as, shot_act, handoff_act])
@@ -549,10 +556,17 @@ class MainWindow(QMainWindow):
         canvas_menu.addAction(QAction("Custom...", self, triggered=self._custom_canvas))
 
         help_menu = mb.addMenu("&Help")
-        help_menu.addAction(QAction("&Keyboard and mouse reference", self,
-                                    shortcut=QKeySequence.HelpContents,
-                                    triggered=self.show_shortcut_reference))
-        help_menu.addAction(QAction("&About MagView", self, triggered=self.show_about))
+        help_act = QAction("&Keyboard and mouse reference", self,
+                           triggered=self.show_shortcut_reference)
+        help_keys = QKeySequence.keyBindings(QKeySequence.HelpContents)
+        f1 = QKeySequence(Qt.Key_F1)
+        if f1 not in help_keys:
+            help_keys.append(f1)
+        help_act.setShortcuts(help_keys)
+        help_menu.addAction(help_act)
+        about_act = QAction("&About MagView", self, triggered=self.show_about)
+        about_act.setMenuRole(QAction.AboutRole)
+        help_menu.addAction(about_act)
 
     def show_shortcut_reference(self) -> None:
         box = QMessageBox(self)
@@ -1429,7 +1443,7 @@ class MainWindow(QMainWindow):
             # View mode (spec section 2): info and selection entries only, no edits.
             menu.addAction("Atom info", lambda s=site: self._on_info(s))
             menu.addAction("Select equivalent  (E)", self.select_equivalent)
-        menu.addAction("Select all magnetic  (Ctrl+A)", self.select_all_magnetic)
+        menu.addAction(f"Select all magnetic  ({shortcut_text('Ctrl+A')})", self.select_all_magnetic)
         return menu
 
     def _ask_magnitude(self) -> None:
