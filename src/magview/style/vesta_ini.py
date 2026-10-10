@@ -9,6 +9,7 @@ meaning is inferred rather than certain are marked as such there.
 from __future__ import annotations
 
 import os
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -162,16 +163,24 @@ class VestaStyle:
 # ---------------------------------------------------------------------------
 
 def parse_elements_ini(path: str | os.PathLike) -> dict[str, VestaElement]:
-    """Parse ``elements.ini``: ``Z symbol r_atomic r_vdW r_ionic R G B`` per line."""
+    """Parse ``elements.ini``: ``Z symbol r_atomic r_vdW r_ionic R G B`` per line.
+
+    Malformed rows are skipped with a warning; one bad line never aborts the load.
+    """
     table: dict[str, VestaElement] = {}
     for lineno, line in enumerate(Path(path).read_text(encoding="latin-1").splitlines(), 1):
         parts = line.split()
         if not parts:
             continue
-        if len(parts) != 8:
-            raise ValueError(f"{path}:{lineno}: expected 8 fields, got {len(parts)}")
-        z, sym = int(parts[0]), parts[1]
-        r_at, r_vdw, r_ion, r, g, b = (float(v) for v in parts[2:])
+        try:
+            if len(parts) != 8:
+                raise ValueError(f"expected 8 fields, got {len(parts)}")
+            z, sym = int(parts[0]), parts[1]
+            r_at, r_vdw, r_ion, r, g, b = (float(v) for v in parts[2:])
+        except ValueError as e:
+            warnings.warn(f"{path}:{lineno}: skipping malformed elements.ini row: {e}",
+                          stacklevel=2)
+            continue
         table[sym] = VestaElement(z, sym, r_at, r_vdw, r_ion, (r, g, b))
     return table
 

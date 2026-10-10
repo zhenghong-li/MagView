@@ -70,6 +70,7 @@ class RenderTheme:
 
     # --- interaction feedback (MagView) ---
     selection_color: RGB = (1.0, 0.85, 0.0)
+    selection_edge_color: RGB = (0.05, 0.10, 0.85)  # opaque wireframe rim (complement of the halo)
     moment_mode_color: RGB = (0.96, 0.62, 0.04)  # amber border
     layer_mode_color: RGB = (0.05, 0.6, 0.6)  # teal border
 

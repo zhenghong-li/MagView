@@ -20,8 +20,11 @@ def has_display() -> bool:
 
 
 def configure_offscreen() -> None:
-    if not has_display():
-        os.environ.setdefault("VTK_DEFAULT_OPENGL_WINDOW", OSMESA_WINDOW)
+    """Force OSMesa/offscreen only when no display is present; with a display,
+    pyvista/VTK defaults are left alone (interactive windows stay possible)."""
+    if has_display():
+        return
+    os.environ.setdefault("VTK_DEFAULT_OPENGL_WINDOW", OSMESA_WINDOW)
     import pyvista as pv
 
     pv.OFF_SCREEN = True
@@ -31,7 +34,10 @@ def make_plotter(size=(1200, 900)):
     configure_offscreen()
     import pyvista as pv
 
-    return pv.Plotter(off_screen=True, window_size=list(size))
+    plotter = pv.Plotter(off_screen=True, window_size=list(size))
+    # Translucent content (moment-view fades, selection halos) needs sorted blending.
+    plotter.enable_depth_peeling()
+    return plotter
 
 
 def render_png(crystal, path: str | Path | None = None, view: str = "oblique",

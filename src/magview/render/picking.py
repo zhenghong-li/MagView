@@ -38,10 +38,13 @@ def pick_sphere(origin: np.ndarray, direction: np.ndarray, centers: np.ndarray,
     t_mid = oc @ direction  # closest approach along the ray
     d2 = np.einsum("ij,ij->i", oc, oc) - t_mid ** 2
     r2 = np.asarray(radii, dtype=float) ** 2
-    hit = (d2 <= r2) & (t_mid >= 0)
+    # The far intersection t_mid + sqrt(r^2-d^2) must lie ahead of the origin:
+    # spheres clipped by the near plane (t_mid < 0) are visible and pickable.
+    root = np.sqrt(np.clip(r2 - d2, 0.0, None))
+    hit = (d2 <= r2) & (t_mid + root >= 0)
     if not hit.any():
         return None
-    t_entry = t_mid - np.sqrt(np.clip(r2 - d2, 0.0, None))
+    t_entry = t_mid - root
     t_entry[~hit] = np.inf
     return int(np.argmin(t_entry))
 

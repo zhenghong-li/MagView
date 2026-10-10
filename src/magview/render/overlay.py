@@ -51,6 +51,22 @@ def _set_polygon(poly: vtk.vtkPolyData, pts: np.ndarray) -> None:
     poly.Modified()
 
 
+def _set_quads(poly: vtk.vtkPolyData, quads: np.ndarray) -> None:
+    """``quads`` is (k, 4, 2): k independent 4-point polygons in display pixels."""
+    quads = np.asarray(quads, dtype=float).reshape(-1, 4, 2)
+    points = vtk.vtkPoints()
+    for x, y in quads.reshape(-1, 2):
+        points.InsertNextPoint(float(x), float(y), 0.0)
+    polys = vtk.vtkCellArray()
+    for q in range(len(quads)):
+        polys.InsertNextCell(4)
+        for i in range(4):
+            polys.InsertCellPoint(4 * q + i)
+    poly.SetPoints(points)
+    poly.SetPolys(polys)
+    poly.Modified()
+
+
 class BoxOverlay:
     """Rubber-band rectangle plus the ring that shows a long press has armed box mode."""
 
@@ -86,7 +102,7 @@ class ModeOverlay:
 
     def __init__(self, renderer) -> None:
         self.renderer = renderer
-        self.border, self._border_poly = _polyline_actor((1, 1, 1), 6.0)
+        self.border, self._border_poly = _polyline_actor((1, 1, 1), 1.0)
         renderer.AddViewProp(self.border)
         self.banner = vtk.vtkTextActor()
         tp = self.banner.GetTextProperty()
@@ -111,9 +127,15 @@ class ModeOverlay:
         self._shown = (text, tuple(color))
         w, h = self.renderer.GetSize()
         self._size = (w, h)
-        inset = 3
-        _set_polyline(self._border_poly, np.array([[inset, inset], [w - inset, inset],
-                                                   [w - inset, h - inset], [inset, h - inset]]))
+        # Four thin filled quads, not a 6px line: wide glLineWidth silently
+        # degrades to 1px on macOS/Metal and some Linux GL drivers.
+        t = 6
+        _set_quads(self._border_poly, np.array([
+            [[0, 0], [w, 0], [w, t], [0, t]],  # bottom
+            [[0, h - t], [w, h - t], [w, h], [0, h]],  # top
+            [[0, t], [t, t], [t, h - t], [0, h - t]],  # left
+            [[w - t, t], [w, t], [w, h - t], [w - t, h - t]],  # right
+        ]))
         self.border.GetProperty().SetColor(*color)
         self.border.VisibilityOn()
         self.banner.SetInput(text)

@@ -67,6 +67,19 @@ def test_theme_from_vesta_matches_builtin_defaults(style):
     assert RenderTheme.from_vesta(style) == RenderTheme()
 
 
+def test_elements_ini_skips_malformed_rows(tmp_path):
+    """One malformed row must not abort the whole elements.ini load."""
+    path = tmp_path / "elements.ini"
+    path.write_text("1 H 0.31 1.09 0.18 1.0 0.5 0.5\n"
+                    "26 Fe 1.26 1.88\n"  # too few fields
+                    "27 bogus row with non-numeric fields here\n"
+                    "29 Cu 1.38 1.87 0.73 0.78 0.50 0.20\n")
+    with pytest.warns(UserWarning, match="skipping malformed"):
+        table = parse_elements_ini(path)
+    assert set(table) == {"H", "Cu"}
+    assert table["Cu"].z == 29
+
+
 def test_pymatgen_fallback_colors_vs_vesta(elements):
     """pymatgen's 'VESTA' scheme is only a rough stand-in (documented finding)."""
     from magview.style.elements import _pymatgen_vesta_colors

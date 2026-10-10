@@ -13,6 +13,7 @@ import numpy as np
 from magview.core.bonds import BondSet, find_bonds
 from magview.core.images import DEFAULT_BOUNDS, DisplayAtoms, boundary_images
 from magview.core.structure import CrystalStructure
+from magview.render.arrows import MIN_LENGTH
 from magview.style.appearance import Appearance
 from magview.style.theme import BondStyle
 
@@ -100,9 +101,10 @@ def build_scene_model(crystal: CrystalStructure, appearance: Appearance,
     atoms = bonds.atoms
 
     atom_symbols = [symbols[p] for p in atoms.parent]
-    styles = [appearance.elements[s] for s in atom_symbols]
-    radius = np.array([st.radius for st in styles]) * theme.ball_scale
-    rgb = np.array([st.color for st in styles], dtype=float).reshape(-1, 3)
+    unique, inverse = np.unique(atom_symbols, return_inverse=True)
+    styles = [appearance.elements[s] for s in unique]  # one lookup per species, not per atom
+    radius = np.array([st.radius for st in styles])[inverse] * theme.ball_scale
+    rgb = np.array([st.color for st in styles], dtype=float).reshape(-1, 3)[inverse]
 
     segs, seg_rgb = _bond_geometry(bonds, atoms, rgb, theme)
 
@@ -118,12 +120,22 @@ def build_scene_model(crystal: CrystalStructure, appearance: Appearance,
         radius = radius * theme.moment_view_atom_scale
         k = theme.moment_view_desaturate
         rgb = (1 - k) * rgb + k * 0.82
-        has_moment = (np.linalg.norm(moments, axis=1) > 0 if moments is not None
-                      else np.zeros(len(atoms), bool))
-        opacity = np.where(has_moment, 1.0, theme.moment_view_nonmagnetic_opacity)
+        opacity = magnetic_opacity(moments, theme.vector_scale, len(atoms),
+                                   theme.moment_view_nonmagnetic_opacity)
 
     return SceneModel(lattice, atoms, atom_symbols, radius, rgb, bonds, segs, seg_rgb,
                       cell_edges(lattice), moments, opacity, grid_edges)
+
+
+def magnetic_opacity(moments: np.ndarray | None, scale: float, n: int, faded: float) -> np.ndarray:
+    """Moment-view opacity: atoms with a drawable arrow are opaque, the rest faded.
+
+    Uses the same threshold as the arrows (norm * scale > MIN_LENGTH) so an atom
+    is faded exactly when it has no arrow.
+    """
+    has = (np.zeros(n, bool) if moments is None
+           else np.linalg.norm(moments, axis=1) * scale > MIN_LENGTH)
+    return np.where(has, 1.0, faded)
 
 
 def _bond_geometry(bonds: BondSet, atoms: DisplayAtoms, atom_rgb: np.ndarray, theme):
