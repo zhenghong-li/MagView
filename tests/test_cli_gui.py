@@ -178,3 +178,17 @@ def test_gui_renders_on_change_not_on_a_timer(tmp_path):
         env=gui_env(MAGVIEW_AUTOSAVE_DIR="off", XDG_CONFIG_HOME=str(tmp_path / "xdg")))
     assert proc.returncode == 0 and "[FAIL]" not in proc.stdout, proc.stdout + proc.stderr
     assert proc.stdout.count("[PASS]") == 14, proc.stdout
+
+
+def test_selftest_flag_dispatches_to_the_gui_selftest(monkeypatch, tmp_path):
+    """Packaged builds run the scripted GUI self-test through the CLI (hidden flag)."""
+    from magview import __main__ as cli
+    from magview.gui import selftest
+
+    seen = {}
+    monkeypatch.setattr(selftest, "main", lambda argv: seen.setdefault("argv", argv) and 0)
+    assert cli.main(["NiO.cif", "--selftest", str(tmp_path)]) == 0
+    assert seen["argv"] == ["NiO.cif", "--out", str(tmp_path)]
+    help_text = subprocess.run([sys.executable, "-m", "magview", "--help"], capture_output=True,
+                               text=True, timeout=60).stdout
+    assert "--selftest" not in help_text

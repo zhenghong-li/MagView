@@ -9,9 +9,27 @@ MagView is a real-time crystal-structure editor modeled on VESTA, with an intera
 3. You choose how the layers stack.
 4. It finds the minimal magnetic supercell and writes a JSON handoff for an AgentDFT backend.
 
-MagView is built in phases; see `docs/reports/`. **Status: all phases (0–5) done.** Features: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing, session files, the layer editor with rule-based completion, inter-layer stacking, and the **minimal magnetic supercell + AgentDFT handoff** (mock bridge). Phase reports: `docs/reports/phase0.md` … `phase5.md`; handoff format: `docs/handoff_format.md`.
+**Status: version 0.1.0, packaged for Linux and WSL; Windows and macOS builds are planned** (see below). It was built in phases; see `docs/reports/`. Features: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing, session files, the layer editor with rule-based completion, inter-layer stacking, and the **minimal magnetic supercell + AgentDFT handoff** (mock bridge). Phase reports: `docs/reports/phase0.md` … `phase5.md`; handoff format: `docs/handoff_format.md`.
 
-## Setup (Ubuntu 24.04 container or WSL)
+## Download and run (Linux / WSL)
+
+Get `MagView-<version>-linux-x86_64.tar.gz` from the [Releases page](https://github.com/zhenghong-li/MagView/releases); nothing else to install (Python, Qt, VTK and pymatgen are inside):
+
+```bash
+tar -xzf MagView-0.1.0-linux-x86_64.tar.gz
+sudo apt install libgl1 libegl1 libgl1-mesa-dri libxcb1 libwayland-client0 fonts-dejavu-core   # OpenGL + fonts, if missing
+cd MagView-0.1.0-linux-x86_64 && ./magview examples/NiO.cif
+```
+
+Needs x86_64 Linux with glibc 2.39+ (Ubuntu 24.04+; on Windows: WSL 2 with WSLg). See `README.txt` in the download for details.
+
+| Platform | Status |
+|---|---|
+| Linux / WSL (x86_64) | released: tarball on the Releases page |
+| Windows 10/11 (x64) | planned: `docs/plans/windows-build.md` |
+| macOS 12+ (Apple Silicon and Intel) | planned: `docs/plans/macos-build.md` |
+
+## Develop from source (Ubuntu 24.04 container or WSL)
 
 ```bash
 sudo platforms/linux-wsl/setup_system_deps.sh   # idempotent apt install (as root: drop sudo)
@@ -23,7 +41,9 @@ python3 -m venv .venv
 
 `platforms/linux-wsl/setup_system_deps.sh --check` reports any missing system packages. `--list` prints the list, which can be mirrored into a Dockerfile. Packages installed with apt live in the container layer, so run the script again after the container is recreated. The venv in the workspace survives the rebuild, but it needs those libraries.
 
-On Windows or macOS hosts no system packages are needed; just create the venv and install from `requirements.txt`.
+Running from source on Windows or macOS is not supported yet; the native builds (`docs/plans/`) add it.
+
+Build the release tarball (fresh build venv, PyInstaller, GUI self-test of the packaged app): `platforms/linux-wsl/build.sh` writes `dist/MagView-<version>-linux-x86_64.tar.gz`. Packaged builds go to GitHub Releases, never into git.
 
 ## Usage
 
@@ -82,7 +102,9 @@ src/magview/          one code base for every platform
   core/ io/ bridge/   pure algorithms, handoff, AgentDFT bridge (no Qt, no VTK)
   style/ render/      VESTA ini parsers and theme; pyvista scene (no Qt), offscreen PNG
   gui/                PySide6 GUI
-platforms/linux-wsl/  system packages, setup script (Linux and WSL)
+  osdeps.py           the only OS-specific code (folders, display, VESTA lookup)
+platforms/linux-wsl/  system packages, setup script, release build script (Linux and WSL)
+packaging/            PyInstaller spec, launcher and license collection shared by all platforms
 tests/                pytest; tests/data holds the test structures
 docs/                 architecture, UX spec, VESTA notes, handoff format, phase reports
 artifacts/phaseN/     rendered evidence for each phase

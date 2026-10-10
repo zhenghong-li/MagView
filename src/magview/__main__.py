@@ -21,7 +21,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--view", choices=VIEWS, default=None, help="camera view (default: oblique)")
     ap.add_argument("--size", nargs=2, type=int, default=(1200, 900), metavar=("W", "H"))
     ap.add_argument("--gui-screenshot", metavar="PNG", help="open GUI, save a screenshot, exit")
+    # Release check: the scripted GUI self-test, reachable from a packaged (frozen)
+    # build, which cannot run "python -m magview.gui.selftest". Not a user feature.
+    ap.add_argument("--selftest", metavar="DIR", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+
+    if args.selftest:
+        if not args.file:
+            ap.error("--selftest needs a structure file")
+        from magview.gui import selftest
+
+        return selftest.main([args.file, "--out", args.selftest])
 
     if args.render:
         if not args.file:

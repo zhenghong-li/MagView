@@ -48,3 +48,7 @@ libxcb-render0
 # --- Virtual display for GUI smoke tests ---
 xvfb
 xauth                      # required by xvfb-run
+
+# --- Release packaging (platforms/linux-wsl/build.sh) ---
+binutils                   # objdump, required by PyInstaller on Linux
+libpython3.12t64           # libpython3.12.so, embedded by PyInstaller
