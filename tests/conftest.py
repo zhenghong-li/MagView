@@ -8,8 +8,12 @@ of failing in confusing ways later.
 
 from __future__ import annotations
 
+import os
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -27,6 +31,39 @@ img = p.screenshot(return_img=True)
 p.close()
 assert img.shape == (8, 8, 3)
 """
+
+
+def pytest_configure(config):
+    """Hermetic test session: Qt settings (window layout, arrow settings), recovery
+    autosaves and mock AgentDFT jobs go to a throwaway directory, never the
+    developer's real ~/.config / ~/.cache / ~/.magview. Subprocesses (CLI, GUI
+    capture, self-test) inherit the environment."""
+    home = Path(tempfile.mkdtemp(prefix="magview-tests-"))
+    config._magview_test_home = home
+    os.environ["XDG_CONFIG_HOME"] = str(home / "config")
+    os.environ["MAGVIEW_AUTOSAVE_DIR"] = str(home / "autosave")
+    os.environ["MAGVIEW_AGENTDFT_DIR"] = str(home / "agentdft_jobs")
+
+
+def pytest_unconfigure(config):
+    home = getattr(config, "_magview_test_home", None)
+    if home is not None:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def run_subprocess(cmd, timeout: float, **kwargs) -> subprocess.CompletedProcess:
+    """``subprocess.run(capture_output=True, text=True)`` that kills the whole process
+    group on timeout: killing only ``xvfb-run`` leaves its Xvfb server and the GUI
+    process running forever."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True, **kwargs)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+        pytest.fail(f"timed out after {timeout} s: {' '.join(map(str, cmd))}\n{out}\n{err}")
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
 
 def pytest_sessionstart(session):

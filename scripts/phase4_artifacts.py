@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -20,7 +19,7 @@ OUT = ROOT / "artifacts" / "phase4"
 sys.path.insert(0, str(ROOT / "scripts"))
 from phase2_artifacts import render_doc  # noqa: E402
 from phase3_artifacts import new_doc  # noqa: E402
-from render_gallery import contact_sheet  # noqa: E402
+from render_gallery import contact_sheet, run_isolated  # noqa: E402
 
 
 def stack(doc, inplane: str, stacking: str):
@@ -93,9 +92,8 @@ def main() -> int:
         out = OUT / "gui_nio"
         if out.exists():
             shutil.rmtree(out)
-        proc = subprocess.run(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
-                               "magview.gui.selftest", str(DATA / "NiO.cif"), "--out", str(out)],
-                              capture_output=True, text=True, timeout=600)
+        proc = run_isolated(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+                               "magview.gui.selftest", str(DATA / "NiO.cif"), "--out", str(out)], timeout=600)
         print(proc.stdout.strip())
         shutil.rmtree(out / "autosave", ignore_errors=True)
         results = json.loads((out / "selftest.json").read_text())

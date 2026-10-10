@@ -10,14 +10,13 @@ helpers of the main window are tested in-process below.
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from conftest import DATA
+from conftest import DATA, run_subprocess
 
 GUI_UNAVAILABLE = 77  # selftest exit code when the GUI cannot start headlessly
 
@@ -29,10 +28,9 @@ def test_gui_selftest_offscreen(tmp_path):
     key handling, hover feedback, autosave recovery, save errors)."""
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     env.pop("VTK_DEFAULT_OPENGL_WINDOW", None)  # the Qt widget must not get an OSMesa window
-    proc = subprocess.run(
+    proc = run_subprocess(
         [sys.executable, "-m", "magview.gui.selftest", str(DATA / "NiO.cif"),
-         "--out", str(tmp_path)],
-        capture_output=True, text=True, timeout=300, env=env)
+         "--out", str(tmp_path)], timeout=300, env=env)
     if proc.returncode == GUI_UNAVAILABLE:
         pytest.skip("Qt offscreen platform cannot host the GUI here: "
                     + (proc.stdout + proc.stderr).strip().splitlines()[-1])

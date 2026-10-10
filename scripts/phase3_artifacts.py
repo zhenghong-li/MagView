@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -18,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "tests" / "data"
 OUT = ROOT / "artifacts" / "phase3"
 sys.path.insert(0, str(ROOT / "scripts"))
-from render_gallery import contact_sheet  # noqa: E402
+from render_gallery import contact_sheet, run_isolated  # noqa: E402
 
 LAYER_COLORS = [(0.89, 0.10, 0.11), (0.22, 0.49, 0.72), (0.30, 0.69, 0.29), (0.60, 0.31, 0.64),
                 (1.00, 0.50, 0.00), (0.65, 0.34, 0.16), (0.97, 0.51, 0.75), (0.40, 0.40, 0.40)]
@@ -228,9 +227,8 @@ def gui_selftests(items) -> bool:
         out = OUT / f"gui_{name.split('_')[0].lower()}"
         if out.exists():
             shutil.rmtree(out)
-        proc = subprocess.run(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
-                               "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(out)],
-                              capture_output=True, text=True, timeout=600)
+        proc = run_isolated(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+                               "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(out)], timeout=600)
         print(proc.stdout.strip())
         shutil.rmtree(out / "autosave", ignore_errors=True)
         results = json.loads((out / "selftest.json").read_text())

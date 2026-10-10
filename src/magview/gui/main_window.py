@@ -243,7 +243,11 @@ class _ViewportKeys(QObject):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, appearance: Appearance | None = None) -> None:
+    def __init__(self, appearance: Appearance | None = None, settings: QSettings | None = None,
+                 autosave: bool = True) -> None:
+        """``settings``: where the window layout and arrow settings persist (default: the
+        user's QSettings). ``autosave=False`` disables recovery autosaves and the
+        restore prompt (batch/capture runs)."""
         super().__init__()
         self.appearance = appearance or Appearance.load()
         self.doc: MagDocument | None = None
@@ -263,13 +267,13 @@ class MainWindow(QMainWindow):
         self.handoff: dict | None = None
         self.previewing = False
         self.bridge = MockAgentDFTBridge()
-        self.autosave_enabled = os.environ.get(project.ENV_AUTOSAVE_DIR, "") != "off"
+        self.autosave_enabled = autosave and os.environ.get(project.ENV_AUTOSAVE_DIR, "") != "off"
         self._autosave_pending = False
         self._saved_camera: tuple | None = None  # camera before layer mode / preview
         self._scene_fp: tuple | None = None  # fingerprint of the document shown in the main scene
         self._pending_workers: set = set()
         self.suggester = ElementRuleSuggester()
-        self.settings = QSettings("MagView", "MagView")
+        self.settings = settings if settings is not None else QSettings("MagView", "MagView")
         self.setWindowTitle(f"MagView {__version__}")
         self.resize(1480, 900)
 

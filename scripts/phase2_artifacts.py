@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -19,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "tests" / "data"
 OUT = ROOT / "artifacts" / "phase2"
 sys.path.insert(0, str(ROOT / "scripts"))
-from render_gallery import contact_sheet  # noqa: E402
+from render_gallery import contact_sheet, run_isolated  # noqa: E402
 
 MAGNETIC = {"Cu", "Cr", "Co", "Ni", "Fe", "V", "Mn"}
 
@@ -267,9 +266,8 @@ def gui_selftests(items) -> bool:
         out = OUT / f"gui_{name.split('_')[0].lower()}"
         if out.exists():
             shutil.rmtree(out)
-        proc = subprocess.run(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
-                               "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(out)],
-                              capture_output=True, text=True, timeout=600)
+        proc = run_isolated(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+                               "magview.gui.selftest", str(DATA / f"{name}.cif"), "--out", str(out)], timeout=600)
         print(proc.stdout.strip())
         shutil.rmtree(out / "autosave", ignore_errors=True)
         results = json.loads((out / "selftest.json").read_text())

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+import tempfile
 
 os.environ.setdefault("QT_API", "pyside6")
 
@@ -12,13 +14,21 @@ def run(path: str | None = None, screenshot: str | None = None, view: str | None
         delay_ms: int = 1500) -> int:
     """Start the GUI. With ``screenshot`` set, capture the screen to a PNG and quit
     (used by the Xvfb smoke test; the capture includes the OpenGL viewports)."""
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QSettings, QTimer
     from PySide6.QtWidgets import QApplication
 
     from magview.gui.main_window import MainWindow
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    win = MainWindow()
+    settings_dir = None
+    if screenshot:
+        # Capture mode is a batch run: it must not depend on (or overwrite) the user's
+        # saved window layout and arrow settings, nor touch their recovery autosaves.
+        settings_dir = tempfile.mkdtemp(prefix="magview-capture-")
+        win = MainWindow(settings=QSettings(os.path.join(settings_dir, "settings.ini"),
+                                            QSettings.IniFormat), autosave=False)
+    else:
+        win = MainWindow()
     win.show()
     if screenshot:
         # Batch/capture mode must never block: reject any unexpected modal dialog
@@ -54,4 +64,8 @@ def run(path: str | None = None, screenshot: str | None = None, view: str | None
             app.exit(0 if ok else 1)
 
         QTimer.singleShot(delay_ms, grab)
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        if settings_dir is not None:
+            shutil.rmtree(settings_dir, ignore_errors=True)

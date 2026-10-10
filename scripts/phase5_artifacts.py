@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -21,7 +20,7 @@ DATA = ROOT / "tests" / "data"
 OUT = ROOT / "artifacts" / "phase5"
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
-from render_gallery import contact_sheet  # noqa: E402
+from render_gallery import contact_sheet, run_isolated  # noqa: E402
 
 RENDER = {"square Neel -> sqrt2 x sqrt2", "NiO AFM-II (rhombohedral)",
           "La2CuO4 A-type (conventional cell)", "Cs3V9Te13 AFM stacking -> 1x1x2",
@@ -112,9 +111,9 @@ def main() -> int:
     if not args.no_gui and shutil.which("xvfb-run"):
         for name in ("Cs3V9Te13_300K", "NiO"):
             out = OUT / f"gui_{name.split('_')[0].lower()}"
-            proc = subprocess.run(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable,
+            proc = run_isolated(["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable,
                                    "-m", "magview.gui.selftest", str(DATA / f"{name}.cif"),
-                                   "--out", str(out)], capture_output=True, text=True, timeout=900)
+                                   "--out", str(out)], timeout=900)
             print(proc.stdout.strip())
             results = json.loads((out / "selftest.json").read_text())
             ok &= proc.returncode == 0 and all(r["ok"] for r in results)

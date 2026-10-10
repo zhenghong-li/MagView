@@ -33,10 +33,11 @@ def main(argv=None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     import os
 
-    os.environ.setdefault("MAGVIEW_AUTOSAVE_DIR", str(out / "autosave"))
-    os.environ.setdefault("MAGVIEW_AGENTDFT_DIR", str(out / "agentdft_jobs"))
-    # Isolate QSettings (window geometry/dock state, arrow settings) from the
-    # developer's real config: a stale restored layout must not break the test.
+    # Hermetic run: autosaves, mock jobs and QSettings (window geometry/dock state,
+    # arrow settings) live under --out, never in the developer's real directories or
+    # an inherited shared directory (the autosave checks count files per run).
+    os.environ["MAGVIEW_AUTOSAVE_DIR"] = str(out / "autosave")
+    os.environ["MAGVIEW_AGENTDFT_DIR"] = str(out / "agentdft_jobs")
     os.environ["XDG_CONFIG_HOME"] = str(out / "xdg_config")
 
     import numpy as np

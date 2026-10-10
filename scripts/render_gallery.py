@@ -52,14 +52,30 @@ def cs3v9te13_fm():
     return crystal, m
 
 
+def run_isolated(cmd, timeout: float) -> subprocess.CompletedProcess:
+    """subprocess.run(capture_output=True, text=True) that kills the whole process group
+    on timeout (killing only xvfb-run leaves Xvfb and the GUI process running)."""
+    import os
+    import signal
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+        err += f"\nkilled after {timeout} s timeout"
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
 def gui_screenshot(path: Path) -> bool:
     if shutil.which("xvfb-run") is None:
         print("skip GUI screenshot: xvfb-run not installed")
         return False
-    proc = subprocess.run(
-        ["xvfb-run", "-a", "-s", "-screen 0 1400x900x24", sys.executable, "-m", "magview",
-         str(DATA / "Cs3V9Te13_300K.cif"), "--gui-screenshot", str(path)],
-        capture_output=True, text=True, timeout=300)
+    proc = run_isolated(
+        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m", "magview",
+         str(DATA / "Cs3V9Te13_300K.cif"), "--gui-screenshot", str(path)], timeout=300)
     print(proc.stdout.strip() or proc.stderr.strip())
     return proc.returncode == 0
 
