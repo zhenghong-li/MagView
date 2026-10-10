@@ -51,6 +51,17 @@ def pytest_unconfigure(config):
         shutil.rmtree(home, ignore_errors=True)
 
 
+def gui_env(**overrides) -> dict:
+    """Environment for a GUI subprocess under xvfb-run: this process's offscreen
+    configuration (QT_QPA_PLATFORM=offscreen from the in-process widget tests,
+    VTK_DEFAULT_OPENGL_WINDOW=OSMesa from the render tests) is dropped, so the GUI
+    runs on X/GLX like a user's session instead of a headless hybrid."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("QT_QPA_PLATFORM", "VTK_DEFAULT_OPENGL_WINDOW")}
+    env.update(overrides)
+    return env
+
+
 def run_subprocess(cmd, timeout: float, **kwargs) -> subprocess.CompletedProcess:
     """``subprocess.run(capture_output=True, text=True)`` that kills the whole process
     group on timeout: killing only ``xvfb-run`` leaves its Xvfb server and the GUI

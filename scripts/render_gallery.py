@@ -54,12 +54,18 @@ def cs3v9te13_fm():
 
 def run_isolated(cmd, timeout: float) -> subprocess.CompletedProcess:
     """subprocess.run(capture_output=True, text=True) that kills the whole process group
-    on timeout (killing only xvfb-run leaves Xvfb and the GUI process running)."""
+    on timeout (killing only xvfb-run leaves Xvfb and the GUI process running).
+
+    The child gets this process's environment minus its offscreen setup
+    (configure_offscreen() selects an OSMesa VTK window), so GUI captures use the
+    same X/GLX path as a user's session."""
     import os
     import signal
 
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("QT_QPA_PLATFORM", "VTK_DEFAULT_OPENGL_WINDOW")}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                            start_new_session=True)
+                            start_new_session=True, env=env)
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
