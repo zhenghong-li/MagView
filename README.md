@@ -128,10 +128,11 @@ scripts/              dev tools: artifact galleries, test-structure generator
 
 ## Contributors
 
-MagView is developed by Zhenghong Li, with assistance from:
+MagView is created and led by **[Zhenghong Li (@zhenghong-li)](https://github.com/zhenghong-li)**.
 
-- **Claude**: the initial application, magnetic-ordering workflow, reviews and Linux/WSL support.
-- **OpenAI Codex**: native Windows source setup, compatibility fixes and GUI validation.
+1. **Zhenghong Li**: project creator and maintainer; requirements, feature design and development direction.
+2. **Claude (AI assistant)**: assistance with the initial application, magnetic-ordering workflow, reviews and Linux/WSL support.
+3. **OpenAI Codex (AI assistant)**: assistance with native Windows source setup, compatibility fixes and GUI validation.
 
 AI assistance is credited through `Co-authored-by` trailers in commit messages.
 
