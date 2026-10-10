@@ -111,3 +111,70 @@ def test_gui_env_drops_offscreen_config(monkeypatch):
     env = gui_env(FOO="1")
     assert "QT_QPA_PLATFORM" not in env and "VTK_DEFAULT_OPENGL_WINDOW" not in env
     assert env["FOO"] == "1" and env["PATH"] == os.environ["PATH"]
+
+
+FRESH_FRAMES = """
+import os, sys, tempfile, resource
+from PySide6.QtCore import QSettings, QTimer, QEventLoop
+from PySide6.QtWidgets import QApplication
+app = QApplication(sys.argv)
+from magview.gui.main_window import MainWindow
+from magview.core.document import MagDocument
+from magview.core.structure import CrystalStructure
+
+win = MainWindow(settings=QSettings(os.path.join(tempfile.mkdtemp(), "s.ini"), QSettings.IniFormat),
+                 autosave=False)
+win.resize(1200, 800); win.show()
+fail = []
+def check(ok, label):
+    print(("[PASS] " if ok else "[FAIL] ") + label, flush=True)
+    if not ok: fail.append(label)
+def idle(ms):
+    loop = QEventLoop(); QTimer.singleShot(ms, loop.quit); loop.exec()
+check(not win.viewport.render_timer.isActive() and not win.reference.render_timer.isActive(),
+      "no periodic re-render timers")
+rendered = {}
+def on_render(*_):
+    c = win.viewport.renderer.GetActiveCamera()
+    rendered["cam"] = (c.GetPosition(), c.GetFocalPoint(), c.GetViewUp(), c.GetParallelScale())
+win.viewport.renderer.AddObserver("StartEvent", on_render)
+def fresh(label):
+    idle(150)
+    c = win.viewport.renderer.GetActiveCamera()
+    live = (c.GetPosition(), c.GetFocalPoint(), c.GetViewUp(), c.GetParallelScale())
+    check(rendered.get("cam") == live, f"frame current after: {label}")
+
+win.set_document(MagDocument.new(CrystalStructure.from_file(sys.argv[1]))); fresh("load")
+rep = win.suggestions.report
+win._accept_suggestions([s for s in rep.items if s.candidate], None); fresh("accept suggestions")
+win.set_view("c"); fresh("view along c")
+win.export_panel.preview.setChecked(True); fresh("magnetic-cell preview on")
+win.undo(); fresh("undo exits the preview (camera restored)")
+win.export_panel.preview.setChecked(True); fresh("preview on again")
+win.export_panel.preview.setChecked(False); fresh("preview off")
+win.toggle_layer_mode(); fresh("layer mode on")
+win.step_layer(1); fresh("next layer")
+win.toggle_layer_mode(); fresh("layer mode off (camera restored)")
+win.resize_canvas([2, 2, 1]); fresh("canvas resize")
+win.set_view("oblique"); fresh("oblique view")
+def cpu(): r = resource.getrusage(resource.RUSAGE_SELF); return r.ru_utime + r.ru_stime
+idle(500); c0 = cpu(); idle(2000); used = cpu() - c0
+check(used < 0.3, f"idle window uses no CPU ({used:.2f} s CPU over 2 s)")
+win.close()
+sys.exit(1 if fail else 0)
+"""
+
+
+@pytest.mark.gui
+@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+def test_gui_renders_on_change_not_on_a_timer(tmp_path):
+    """pyvistaqt's default auto_update re-rendered both views 5x per second forever
+    (2-4 CPU cores busy on an idle window with software GL). Without it, every scene
+    change must render by itself: after each operation the last rendered camera must
+    equal the live camera (a missed render leaves a stale frame on screen)."""
+    proc = run_subprocess(
+        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-c", FRESH_FRAMES,
+         str(DATA / "NiO.cif")], timeout=300,
+        env=gui_env(MAGVIEW_AUTOSAVE_DIR="off", XDG_CONFIG_HOME=str(tmp_path / "xdg")))
+    assert proc.returncode == 0 and "[FAIL]" not in proc.stdout, proc.stdout + proc.stderr
+    assert proc.stdout.count("[PASS]") == 14, proc.stdout

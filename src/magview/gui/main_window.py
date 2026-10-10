@@ -348,8 +348,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"MagView {__version__}")
         self.resize(1480, 900)
 
-        # Main 3D view: the editing canvas.
-        self.viewport = QtInteractor(self)
+        # Main 3D view: the editing canvas. No auto_update: pyvistaqt's default re-renders
+        # both views 5x per second forever (2-4 CPU cores busy on an idle window with
+        # software GL); every scene change here renders explicitly instead.
+        self.viewport = QtInteractor(self, auto_update=False)
         self.setCentralWidget(self.viewport.interactor)
         self.scene = StructureScene(self.viewport, self.appearance.theme)
         self.editor = EditorViewport(self.viewport, self.scene, ViewportCallbacks(
@@ -369,7 +371,7 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._flush_autosave)
 
         # Right dock: reference view of the full input cell + structure info.
-        self.reference = QtInteractor(self)
+        self.reference = QtInteractor(self, auto_update=False)
         self.reference.setMinimumSize(280, 240)
         self.reference.iren.clear_key_event_callbacks()
         self.ref_scene = StructureScene(self.reference, self.appearance.theme, show_axes=False)
