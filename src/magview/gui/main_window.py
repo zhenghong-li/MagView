@@ -134,6 +134,30 @@ def recovery_autosave(crystal: CrystalStructure, opened: Path) -> Path | None:
     return None
 
 
+class _BusyInputBlocker(QObject):
+    """Swallows user input aimed at one window while a background job runs.
+
+    The busy dialog is modal but only appears after a short delay; until then the
+    local event loop would deliver clicks, drags and shortcuts (an edit, a second
+    Analyze, Ctrl+O) that change or replace the document the job is working on."""
+
+    BLOCKED = frozenset({QEvent.MouseButtonPress, QEvent.MouseButtonRelease,
+                         QEvent.MouseButtonDblClick, QEvent.KeyPress, QEvent.KeyRelease,
+                         QEvent.Wheel, QEvent.ContextMenu, QEvent.Shortcut,
+                         QEvent.ShortcutOverride})
+
+    def __init__(self, window: QWidget) -> None:
+        super().__init__(window)
+        self.window = window
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt naming)
+        if event.type() not in self.BLOCKED:
+            return False
+        if isinstance(obj, QWidget):
+            return obj.window() is self.window
+        return event.type() == QEvent.Shortcut  # QActions receive shortcuts directly
+
+
 class _WorkerSignals(QObject):
     finished = Signal(object)  # work result
     failed = Signal(object)  # the raised exception
@@ -510,10 +534,17 @@ class MainWindow(QMainWindow):
         self._pending_workers.add(runnable)
         signals.finished.connect(lambda *_: self._pending_workers.discard(runnable))
         signals.failed.connect(lambda *_: self._pending_workers.discard(runnable))
-        QThreadPool.globalInstance().start(runnable)
-        loop.exec()
-        show_later.stop()
-        dialog.close()
+        blocker = _BusyInputBlocker(self)
+        app = QApplication.instance()
+        app.installEventFilter(blocker)
+        try:
+            QThreadPool.globalInstance().start(runnable)
+            loop.exec()
+        finally:
+            app.removeEventFilter(blocker)
+            blocker.deleteLater()
+            show_later.stop()
+            dialog.close()
         if "error" in out:
             return False, out["error"]
         return True, out.get("result")
@@ -1033,6 +1064,7 @@ class MainWindow(QMainWindow):
         if self.doc is None:
             return False
         doc, axis = self.doc, self.layer_axis
+        revision = doc.history.revision
 
         def work():
             cell = minimal_magnetic_cell(doc)  # spglib MSG search: seconds on big cells
@@ -1041,6 +1073,11 @@ class MainWindow(QMainWindow):
         ok, result = self._run_blocking(work, "Analyzing the minimal magnetic cell ...")
         if not ok:
             QMessageBox.warning(self, "Analysis failed", str(result))
+            return False
+        if self.doc is not doc or doc.history.revision != revision:
+            # Never present (or export) a result for a configuration that is gone.
+            self.statusBar().showMessage("The configuration changed during the analysis - "
+                                         "analyze again")
             return False
         self.mag_cell, self.handoff = result
         self.export_panel.show_result(self.mag_cell, self.handoff)

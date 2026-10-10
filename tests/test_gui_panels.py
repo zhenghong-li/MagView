@@ -159,3 +159,48 @@ def test_layer_panel_stacking_buttons_are_diffed(qapp):
     finally:
         p.close()
         p.deleteLater()
+
+
+def test_busy_input_blocker(qapp):
+    """While a background job runs, clicks, keys and shortcuts aimed at the main window
+    are swallowed (they used to edit or replace the document the job was analysing);
+    other windows keep working, and removing the filter restores input."""
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QAction, QKeyEvent, QMouseEvent
+    from PySide6.QtWidgets import QMainWindow, QPushButton
+
+    from magview.gui.main_window import _BusyInputBlocker
+
+    win = QMainWindow()
+    button = QPushButton("edit", win)
+    win.setCentralWidget(button)
+    other = QPushButton("other window")
+    clicks = {"win": 0, "other": 0, "action": 0}
+    button.clicked.connect(lambda: clicks.__setitem__("win", clicks["win"] + 1))
+    other.clicked.connect(lambda: clicks.__setitem__("other", clicks["other"] + 1))
+    action = QAction("flip", win)
+    action.triggered.connect(lambda: clicks.__setitem__("action", clicks["action"] + 1))
+
+    def click(w):
+        for t in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+            qapp.sendEvent(w, QMouseEvent(t, QPointF(5, 5), QPointF(5, 5), Qt.LeftButton,
+                                          Qt.LeftButton, Qt.NoModifier))
+
+    blocker = _BusyInputBlocker(win)
+    qapp.installEventFilter(blocker)
+    try:
+        click(button)
+        click(other)
+        key = QKeyEvent(QEvent.KeyPress, Qt.Key_F, Qt.NoModifier, "f")
+        assert blocker.eventFilter(button, key)  # window keys swallowed
+        assert not blocker.eventFilter(other, key)
+        assert blocker.eventFilter(action, QEvent(QEvent.Shortcut))
+        assert not blocker.eventFilter(button, QEvent(QEvent.Paint))  # painting goes on
+    finally:
+        qapp.removeEventFilter(blocker)
+    assert clicks == {"win": 0, "other": 1, "action": 0}
+    click(button)
+    assert clicks["win"] == 1
+    for w in (win, other):
+        w.close()
+        w.deleteLater()

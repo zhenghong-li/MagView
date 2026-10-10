@@ -57,6 +57,7 @@ class History:
         self._undo: list[Command] = []
         self._redo: list[Command] = []
         self._listeners: list[Callable[[], None]] = []
+        self.revision = 0  # bumped by every state change (push, undo, redo)
 
     def subscribe(self, fn: Callable[[], None]) -> None:
         self._listeners.append(fn)
@@ -72,6 +73,7 @@ class History:
         if len(self._undo) > self.limit:
             self._undo.pop(0)
         self._redo.clear()
+        self.revision += 1
         self._notify()
 
     def undo(self) -> str | None:
@@ -80,6 +82,7 @@ class History:
         cmd = self._undo.pop()
         cmd.revert(self.target)
         self._redo.append(cmd)
+        self.revision += 1
         self._notify()
         return cmd.label
 
@@ -89,6 +92,7 @@ class History:
         cmd = self._redo.pop()
         cmd.apply(self.target)
         self._undo.append(cmd)
+        self.revision += 1
         self._notify()
         return cmd.label
 

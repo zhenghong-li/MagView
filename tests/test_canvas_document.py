@@ -182,3 +182,22 @@ def test_site_label(load):
     doc = MagDocument.new(load("Cs3V9Te13_300K"))
     i = int(np.nonzero(doc.canvas.translation[:, 0] == 1)[0][0])
     assert "cell [1, 0, 0]" in doc.site_label(i)
+
+
+def test_history_revision_tracks_state_changes():
+    """revision changes exactly when the document state changes (push/undo/redo); the
+    GUI uses it to discard background results computed for an older state."""
+    h = History(None)
+    assert h.revision == 0
+    h.push(FunctionCommand("a", lambda t: None, lambda t: None))
+    assert h.revision == 1
+    assert h.undo() == "a" and h.revision == 2
+    assert h.undo() is None and h.revision == 2  # nothing to undo: unchanged
+    assert h.redo() == "a" and h.revision == 3
+
+    def boom(_):
+        raise RuntimeError("no")
+
+    with pytest.raises(RuntimeError):
+        h.push(FunctionCommand("bad", boom, lambda t: None))
+    assert h.revision == 3  # a failed edit changed nothing
