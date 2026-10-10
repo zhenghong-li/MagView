@@ -12,7 +12,9 @@ bc0b7a3 Phase 0: foundations - structure loading, VESTA-like rendering, GUI shel
 ```
 
 **Verification:**
-- **237 automated tests pass**, including a run in a fresh venv built only from `requirements.txt`.
+- **287 automated tests pass** in the deterministic container environment (OSMesa GL), 283 on a plain host venv built only from `requirements.txt` (GUI/xvfb tests skip without a display server). 49 of the new tests are regression tests from the review rounds.
+- A **review pass after the phase work** (three commits: core+io, render+style, gui) fixed 43 findings: correctness (centring enumeration, buckled-layer classification, pin survival, session/handoff validation), performance (in-place drag updates, glyph memory, LOD), and GUI robustness (preview edit guard, focus-proof shortcuts, async load/analyze, camera preservation, save-error dialogs, hover/cursor feedback, autosave recovery, portable bond rendering).
+- The **GUI self-test runs 92/92 checks green under Xvfb** (NiO), including the phase-6 robustness checks.
 - A **scripted GUI self-test** drives the real Qt window with synthetic mouse and keyboard events under Xvfb: 54 checks on NiO and 50 on your **Cs3V9Te13** CIF, all passing.
 - Each phase has a report (`docs/reports/phaseN.md`) and rendered evidence (`artifacts/phaseN/contact_sheet.png`).
 
