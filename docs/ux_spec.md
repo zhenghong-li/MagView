@@ -106,7 +106,7 @@ These apply to the current selection. Each one is a single undo step.
 
 ## 7. Keyboard summary
 
-`M` moment mode · `L` layer mode · `PgUp`/`PgDn` previous/next layer · `Esc` cancel/exit · `B` arm box select · `P` patterns · `F` flip selection · `0` zero selection · `Ctrl+A` select all magnetic sites · `Ctrl+Z`/`Ctrl+Y` undo/redo · hold `X Y Z A B C` axis lock · hold `Shift` snap.
+`M` moment mode · `L` layer mode · `PgUp`/`PgDn` previous/next layer · `Esc` cancel/exit · `B` arm box select · `P` patterns · `F` flip selection · `0` zero selection · `E` select equivalent sites · `Ctrl+A` select all magnetic sites · `Ctrl+Z`/`Ctrl+Y` undo/redo · hold `X Y Z A B C` axis lock · hold `Shift` snap · `F1` this list in the app (Help menu).
 
 ## 8. Changes made during implementation (Phase 2)
 

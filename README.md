@@ -39,7 +39,7 @@ On Windows or macOS hosts no system packages are needed; just create the venv an
 xvfb-run -a .venv/bin/python -m magview.gui.selftest FILE.cif --out DIR   # scripted GUI test
 ```
 
-Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel zooms. Click selects; Shift-click adds, Ctrl-click toggles. **Long-press (0.35 s) then drag** draws a rubber band (or press `B`, then drag). `Esc` cancels or clears, `Ctrl+A` selects all magnetic sites, `E` selects equivalent sites, and `Ctrl+Z` / `Ctrl+Y` undo and redo.
+Mouse (View mode): left-drag rotates, middle-drag or Shift+left-drag pans, wheel zooms. Click selects; Shift-click adds, Ctrl-click toggles. **Long-press (0.35 s) then drag** draws a rubber band (or press `B`, then drag). `Esc` cancels or clears, `Ctrl+A` selects all magnetic sites, `E` selects equivalent sites, and `Ctrl+Z` / `Ctrl+Y` undo and redo. `F1` (Help menu) shows every key and mouse gesture.
 
 **Moment mode** (`M` or the toolbar):
 - Drag from an atom to set its moment; the arrow tip follows the cursor. Hold `X`/`Y`/`Z`/`A`/`B`/`C` to lock to an axis, and `Shift` to snap.

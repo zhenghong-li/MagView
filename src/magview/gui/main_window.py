@@ -92,6 +92,53 @@ COMMAND_KEYS = (Qt.Key_M, Qt.Key_L, Qt.Key_F, Qt.Key_0, Qt.Key_P, Qt.Key_E)
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 AUTOSAVE_DEBOUNCE_MS = 2000
 
+# In-app keyboard & mouse reference (Help > F1). Keep in sync with _ViewportKeys,
+# the window shortcuts and docs/ux_spec.md; tests check every command key is listed.
+SHORTCUT_REFERENCE = (
+    ("Modes", (
+        ("M", "moment-edit mode on/off (drag from an atom to set its moment)"),
+        ("L", "layer editor on/off"),
+        ("Esc", "cancel the gesture; again: leave the mode; in View mode: clear the selection"),
+    )),
+    ("Mouse", (
+        ("Left-drag", "rotate"),
+        ("Middle-drag, Shift+drag on empty space", "pan"),
+        ("Wheel, right-drag", "zoom"),
+        ("Click", "select an atom (Shift adds, Ctrl toggles; empty space clears)"),
+        ("Long-press 0.35 s, then drag", "box select (or press B, then drag)"),
+        ("Right-click", "context menu (Moment mode: edits; Layer mode: unset the site)"),
+    )),
+    ("Selection", (
+        ("F, 0", "flip / zero the selected moments"),
+        ("P", "FM/AFM patterns that fit the selection"),
+        ("E", "select symmetry-equivalent sites"),
+        ("Ctrl+A", "select all magnetic sites"),
+    )),
+    ("While dragging a moment", (
+        ("Hold X / Y / Z / A / B / C", "lock to that Cartesian or lattice axis"),
+        ("Hold Shift", "snap the direction (15 deg) and |m| (0.1 muB)"),
+        ("Drag a selected atom", "sets the whole selection"),
+    )),
+    ("Layer mode", (
+        ("Click", "set up / down (pins the site)"),
+        ("PgUp, PgDown", "previous / next layer"),
+    )),
+    ("Edit and files", (
+        ("Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z", "undo, redo"),
+        ("Ctrl+O, Ctrl+S, Ctrl+Shift+S", "open, save session, save session as"),
+        ("F1", "this reference"),
+    )),
+)
+
+
+def shortcut_reference_html() -> str:
+    rows = []
+    for section, entries in SHORTCUT_REFERENCE:
+        rows.append(f"<tr><td colspan=2><br><b>{section}</b></td></tr>")
+        rows += [f"<tr><td nowrap><code>{k}</code>&nbsp;&nbsp;</td><td>{v}</td></tr>"
+                 for k, v in entries]
+    return "<table>" + "".join(rows) + "</table>"
+
 
 def _is_text_entry(widget) -> bool:
     """True when the widget (or an ancestor) is a text/number entry field that
@@ -388,7 +435,9 @@ class MainWindow(QMainWindow):
         self._load_arrow_settings()
         self._set_mode_chip(ia.Mode.VIEW)
         self._restore_window_state()
-        self.statusBar().showMessage(f"Appearance: {self.appearance.source}")
+        self.statusBar().showMessage("Open a structure or session: File > Open (Ctrl+O).   "
+                                     "F1: keyboard and mouse reference.   "
+                                     f"Appearance: {self.appearance.source}")
 
     def _restore_window_state(self) -> None:
         """Restore the geometry/dock layout of the last run (QSettings; sizes are in
@@ -487,6 +536,29 @@ class MainWindow(QMainWindow):
             canvas_menu.addAction(QAction("x".join(map(str, preset)), self,
                                           triggered=lambda _=False, p=preset: self.resize_canvas(p)))
         canvas_menu.addAction(QAction("Custom...", self, triggered=self._custom_canvas))
+
+        help_menu = mb.addMenu("&Help")
+        help_menu.addAction(QAction("&Keyboard and mouse reference", self,
+                                    shortcut=QKeySequence.HelpContents,
+                                    triggered=self.show_shortcut_reference))
+        help_menu.addAction(QAction("&About MagView", self, triggered=self.show_about))
+
+    def show_shortcut_reference(self) -> None:
+        box = QMessageBox(self)
+        box.setWindowTitle("MagView - keyboard and mouse")
+        box.setTextFormat(Qt.RichText)
+        box.setText(shortcut_reference_html())
+        box.setStyleSheet("QLabel { min-width: 760px; }")  # QMessageBox wraps narrow by default
+        box.exec()
+
+    def show_about(self) -> None:
+        QMessageBox.about(
+            self, "About MagView",
+            f"<b>MagView {__version__}</b><br>Crystal-structure editor for magnetic orderings, "
+            "with a minimal-magnetic-cell analysis and an AgentDFT handoff.<br><br>"
+            f"Element colors, radii and bond rules: {self.appearance.source}.<br>"
+            "VESTA data is read at runtime from your own installation and never "
+            "redistributed (K. Momma and F. Izumi, J. Appl. Crystallogr. 44, 1272 (2011)).")
 
     def _wire_moment_panel(self) -> None:
         p = self.moments_panel

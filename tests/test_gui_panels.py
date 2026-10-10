@@ -204,3 +204,24 @@ def test_busy_input_blocker(qapp):
     for w in (win, other):
         w.close()
         w.deleteLater()
+
+
+def test_shortcut_reference_lists_every_key():
+    """The in-app F1 reference names every viewport command key, axis lock and
+    window shortcut, so a key added later cannot stay undiscoverable."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QKeySequence
+
+    from magview.gui.main_window import (COMMAND_KEYS, LOCK_KEYS, SHORTCUT_REFERENCE,
+                                         shortcut_reference_html)
+
+    keys_text = " ".join(k for _, entries in SHORTCUT_REFERENCE for k, _ in entries)
+    tokens = set(keys_text.replace(",", " ").replace("/", " ").replace("+", " ").split())
+    for key in (*COMMAND_KEYS, *LOCK_KEYS, Qt.Key_B, Qt.Key_PageUp, Qt.Key_PageDown,
+                Qt.Key_Escape, Qt.Key_F1):
+        name = QKeySequence(key).toString()
+        assert name in tokens, f"{name} missing from the F1 reference"
+    for combo in ("Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "Ctrl+A", "Ctrl+O", "Ctrl+S", "Ctrl+Shift+S"):
+        assert combo in keys_text, combo
+    html = shortcut_reference_html()
+    assert html.startswith("<table>") and "Layer mode" in html

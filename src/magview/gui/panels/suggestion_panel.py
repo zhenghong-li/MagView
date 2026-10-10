@@ -34,7 +34,8 @@ class SuggestionPanel(QWidget):
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
-        self.header = QLabel("Load a structure to get magnetic-site suggestions.")
+        self.header = QLabel("Open a structure (File > Open, Ctrl+O) to get magnetic-site "
+                             "suggestions.<br>F1 lists every key and mouse gesture.")
         self.header.setWordWrap(True)
         lay.addWidget(self.header)
 
