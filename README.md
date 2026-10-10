@@ -113,3 +113,7 @@ docs/plans/           Windows and macOS build plans
 artifacts/phaseN/     rendered evidence for each phase
 scripts/              dev tools: artifact galleries, test-structure generator
 ```
+
+## License
+
+[MIT](LICENSE) — use it for anything, just keep the copyright notice.
