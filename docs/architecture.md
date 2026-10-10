@@ -9,12 +9,17 @@ render/   pyvista/VTK, no Qt    scene model -> actors; identical onscreen and of
   |
 style/    pure Python           VESTA ini parsers, element styles, theme, Appearance
   |
-core/     numpy/pymatgen/spglib structure, images, bonds; later canvas, moments, layers,
-                                patterns, stacking, minimal magnetic cell
+bridge/   pure Python           AgentDFT interface + mock (validates and stores jobs)
+  |
+io/       pure Python           handoff build + JSON Schema/semantic validation
+  |
+core/     numpy/pymatgen/spglib structure, images, bonds, canvas, document + history,
+                                moments, layers, patterns, stacking, minimal magnetic cell
 ```
 
 `tests/test_architecture.py` enforces the import rules:
 - `core` imports nothing from `style`, `render`, `gui`, VTK, pyvista or Qt.
+- `io` and `bridge` import no `style`, `render`, `gui`, VTK, pyvista or Qt.
 - `style` imports no VTK and no Qt.
 - `render` imports no Qt.
 
@@ -91,4 +96,5 @@ candidate --doc.apply_completion--> whole layer set (one undo step)
 - **Lighting:** a single headlight with ambient 0.10, diffuse 0.70, specular 0.80 and power 25.6, matching VESTA's LIGHT0/ATOMM.
 - **Arrows:** generated in numpy with a constant shaft radius, unlike VTK glyphs, which scale uniformly. The mesh topology depends only on the arrow count, so a drag can rewrite points in place.
 - **Axes triad:** a separate overlay renderer whose camera copies the main camera's orientation at every render. It works offscreen, where VTK orientation widgets need an interactor.
+- **Render on change:** both GUI views are `QtInteractor(auto_update=False)`. pyvistaqt's default re-renders 5 times per second forever (2-4 CPU cores on an idle window with software GL), so every scene mutation renders explicitly; `test_gui_renders_on_change_not_on_a_timer` catches a forgotten render (stale frame).
 - **Offscreen:** with no `DISPLAY`, `VTK_DEFAULT_OPENGL_WINDOW=vtkOSOpenGLRenderWindow` (OSMesa, llvmpipe). The GUI smoke test runs the real Qt GUI under Xvfb with Mesa GLX and captures the X screen, so both OpenGL viewports are included.

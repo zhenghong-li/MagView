@@ -1,4 +1,4 @@
-"""Layering rules: core/ is GUI- and VTK-free; render/ is Qt-free."""
+"""Layering rules: core/, io/ and bridge/ are GUI- and VTK-free; render/ is Qt-free."""
 
 import ast
 from pathlib import Path
@@ -13,6 +13,11 @@ FORBIDDEN = {
     "render": {"PySide6", "qtpy", "pyvistaqt", "magview.gui"},
     "style": {"PySide6", "qtpy", "pyvistaqt", "vtk", "vtkmodules", "pyvista", "magview.render",
               "magview.gui"},
+    # The handoff and the bridge run headless (AgentDFT side): no GUI or drawing stack.
+    "io": {"PySide6", "qtpy", "pyvistaqt", "vtk", "vtkmodules", "pyvista", "magview.render",
+           "magview.gui", "magview.style"},
+    "bridge": {"PySide6", "qtpy", "pyvistaqt", "vtk", "vtkmodules", "pyvista", "magview.render",
+               "magview.gui", "magview.style"},
 }
 
 
