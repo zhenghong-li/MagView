@@ -16,6 +16,7 @@ import numpy as np
 import vtk
 from PySide6.QtCore import Qt, QTimer
 
+from magview import osdeps
 from magview.core import interaction as ia
 from magview.render.overlay import BoxOverlay, ModeOverlay
 from magview.render.picking import atoms_in_box, pick_atom
@@ -80,7 +81,7 @@ class EditorInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         x0, y0 = self._right_press
         x, y = self._pos()
         self._right_press = None
-        if abs(x - x0) + abs(y - y0) < ia.CLICK_SLOP:
+        if abs(x - x0) + abs(y - y0) < ia.CLICK_SLOP * self.viewport.pixel_ratio():
             self.viewport.cb.context_menu(self.viewport.pick(x, y))
 
     def _on_move(self, *_):
@@ -103,8 +104,8 @@ class EditorViewport:
         # Register through pyvista: it re-applies its remembered style on some calls
         # (update_style); setting it any other way gets silently reverted.
         plotter.iren.style = self.style
-        self.box = BoxOverlay(plotter.renderer)
-        self.mode_overlay = ModeOverlay(plotter.renderer)
+        self.box = BoxOverlay(plotter.renderer, pixel_ratio=self.pixel_ratio)
+        self.mode_overlay = ModeOverlay(plotter.renderer, pixel_ratio=self.pixel_ratio)
         self._timer = QTimer()
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.tick)
@@ -123,6 +124,9 @@ class EditorViewport:
         return time.monotonic()
 
     def press(self, x: float, y: float, mods: ia.Mods) -> None:
+        # VTK supplies physical pixels; retain the same logical click/drag
+        # threshold after a Retina screen change, including long-press jitter.
+        self.machine.click_slop = ia.CLICK_SLOP * self.pixel_ratio()
         hit = self.pick(x, y)
         self.press_display_index = self._last_display_pick
         self._press_pan = bool(mods.shift) and hit is None
@@ -160,6 +164,9 @@ class EditorViewport:
         self._run(self.machine.set_mode(mode))
 
     # -- helpers ----------------------------------------------------------------------
+    def pixel_ratio(self) -> float:
+        return osdeps.gui_pixel_ratio(self.plotter.interactor.devicePixelRatioF())
+
     def pick(self, x: float, y: float) -> int | None:
         """Canvas site under display pixel (x, y); remembers the displayed atom too."""
         model = self.scene.model

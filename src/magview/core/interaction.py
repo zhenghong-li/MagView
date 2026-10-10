@@ -189,6 +189,7 @@ class InteractionMachine:
     _box_start: tuple[float, float] = (0.0, 0.0)
     _last: tuple[float, float] = (0.0, 0.0)
     log: list = field(default_factory=list)  # every action emitted (for debugging/tests)
+    click_slop: float = CLICK_SLOP  # GUI may scale logical pixels to display pixels
 
     # -- public API ---------------------------------------------------------------
     def handle(self, event) -> list:
@@ -243,7 +244,7 @@ class InteractionMachine:
         self._last = (e.x, e.y)
         if self.state == GestureState.PRESSED:
             p = self._press
-            if _dist(p.x, p.y, e.x, e.y) < CLICK_SLOP:
+            if _dist(p.x, p.y, e.x, e.y) < self.click_slop:
                 return []
             if self._camera_forwarded:
                 self.state = GestureState.CAMERA
@@ -261,7 +262,7 @@ class InteractionMachine:
         if self.state != GestureState.PRESSED or self._press is None:
             return []
         p = self._press
-        if e.t - p.t < LONG_PRESS_S or _dist(p.x, p.y, *self._last) >= CLICK_SLOP:
+        if e.t - p.t < LONG_PRESS_S or _dist(p.x, p.y, *self._last) >= self.click_slop:
             return []
         out = [CameraRelease()] if self._camera_forwarded else []
         self._camera_forwarded = False

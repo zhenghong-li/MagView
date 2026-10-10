@@ -6,6 +6,16 @@ import pytest
 from magview import osdeps
 
 
+@pytest.mark.parametrize("platform,native,scale", [
+    ("darwin", True, 2.0), ("win32", False, 1.0), ("linux", False, 1.0),
+])
+def test_native_gui_policy(monkeypatch, platform, native, scale):
+    monkeypatch.setattr(osdeps, "PLATFORM", platform)
+    assert osdeps.native_gui_workarounds() is native
+    assert osdeps.gui_pixel_ratio(2.0) == scale
+    assert osdeps.gui_pixel_ratio(1.0) == 1.0
+
+
 def test_cache_dir_follows_xdg(tmp_path, monkeypatch):
     monkeypatch.setattr(osdeps, "PLATFORM", "linux")
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")

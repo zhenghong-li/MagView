@@ -19,7 +19,9 @@ def run(path: str | None = None, screenshot: str | None = None, view: str | None
 
     from magview.gui.main_window import MainWindow
     from magview.gui.capture import capture_window
+    from magview.gui.qt_compat import configure_surface_format
 
+    configure_surface_format()
     app = QApplication.instance() or QApplication(sys.argv[:1])
     settings_dir = None
     if screenshot:

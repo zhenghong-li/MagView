@@ -70,7 +70,9 @@ def _set_quads(poly: vtk.vtkPolyData, quads: np.ndarray) -> None:
 class BoxOverlay:
     """Rubber-band rectangle plus the ring that shows a long press has armed box mode."""
 
-    def __init__(self, renderer, color=(0.85, 0.45, 0.0), fill_opacity: float = 0.12) -> None:
+    def __init__(self, renderer, color=(0.85, 0.45, 0.0), fill_opacity: float = 0.12,
+                 pixel_ratio=None) -> None:
+        self.pixel_ratio = pixel_ratio or (lambda: 1.0)
         self.box, self._box_poly = _polyline_actor(color, 2.0)
         self.ring, self._ring_poly = _polyline_actor(color, 2.0)
         self.fill, self._fill_poly = _polyline_actor(color, 1.0)
@@ -80,6 +82,7 @@ class BoxOverlay:
         renderer.AddViewProp(self.ring)
 
     def armed(self, x: float, y: float, radius: float = 10.0) -> None:
+        radius *= self.pixel_ratio()
         t = np.linspace(0, 2 * np.pi, 33)[:-1]
         _set_polyline(self._ring_poly, np.column_stack([x + radius * np.cos(t), y + radius * np.sin(t)]))
         self.ring.VisibilityOn()
@@ -100,8 +103,9 @@ class BoxOverlay:
 class ModeOverlay:
     """Colored border around the viewport and a one-line banner (top-left)."""
 
-    def __init__(self, renderer) -> None:
+    def __init__(self, renderer, pixel_ratio=None) -> None:
         self.renderer = renderer
+        self.pixel_ratio = pixel_ratio or (lambda: 1.0)
         self.border, self._border_poly = _polyline_actor((1, 1, 1), 1.0)
         renderer.AddViewProp(self.border)
         self.banner = vtk.vtkTextActor()
@@ -116,20 +120,23 @@ class ModeOverlay:
         renderer.AddViewProp(self.banner)
         self._shown: tuple[str, tuple] | None = None
         self._size = (0, 0)
+        self._scale = 1.0
         renderer.AddObserver("StartEvent", self._relayout)
 
     def _relayout(self, *_):
         # Keep the border on the viewport edge when the window is resized.
-        if self._shown is not None and tuple(self.renderer.GetSize()) != self._size:
+        if self._shown is not None and (tuple(self.renderer.GetSize()) != self._size
+                                       or self.pixel_ratio() != self._scale):
             self.show(*self._shown)
 
     def show(self, text: str, color) -> None:
         self._shown = (text, tuple(color))
         w, h = self.renderer.GetSize()
         self._size = (w, h)
+        scale = self._scale = self.pixel_ratio()
         # Four thin filled quads, not a 6px line: wide glLineWidth silently
         # degrades to 1px on macOS/Metal and some Linux GL drivers.
-        t = 6
+        t = 6 * scale
         _set_quads(self._border_poly, np.array([
             [[0, 0], [w, 0], [w, t], [0, t]],  # bottom
             [[0, h - t], [w, h - t], [w, h], [0, h]],  # top
@@ -140,7 +147,7 @@ class ModeOverlay:
         self.border.VisibilityOn()
         self.banner.SetInput(text)
         self.banner.GetTextProperty().SetBackgroundColor(*color)
-        self.banner.SetDisplayPosition(12, h - 34)
+        self.banner.SetDisplayPosition(round(12 * scale), round(h - 34 * scale))
         self.banner.VisibilityOn()
 
     def hide(self) -> None:
@@ -152,8 +159,9 @@ class ModeOverlay:
 class CursorLabel:
     """Small multi-line readout next to the cursor (live drag feedback)."""
 
-    def __init__(self, renderer) -> None:
+    def __init__(self, renderer, pixel_ratio=None) -> None:
         self.renderer = renderer
+        self.pixel_ratio = pixel_ratio or (lambda: 1.0)
         self.actor = vtk.vtkTextActor()
         tp = self.actor.GetTextProperty()
         tp.SetFontSize(14)
@@ -169,10 +177,12 @@ class CursorLabel:
     def show(self, text: str, x: float, y: float) -> None:
         self.actor.SetInput(text)
         w, h = self.renderer.GetSize()
+        scale = self.pixel_ratio()
         lines = text.count("\n") + 1
-        width = 9 * max(len(s) for s in text.splitlines())
-        px = min(max(4, x + 18), max(4, w - width - 4))
-        py = min(max(4, y - 18 - 17 * lines), h - 17 * lines - 4)
+        width = 9 * scale * max(len(s) for s in text.splitlines())
+        margin, offset, height = 4 * scale, 18 * scale, 17 * scale * lines
+        px = min(max(margin, x + offset), max(margin, w - width - margin))
+        py = min(max(margin, y - offset - height), h - height - margin)
         self.actor.SetDisplayPosition(int(px), int(py))
         self.actor.VisibilityOn()
 

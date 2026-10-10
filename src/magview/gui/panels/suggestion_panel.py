@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from magview.core.suggest import SiteSuggestion, SuggestionReport
+from magview.gui.shortcuts import shortcut_text
 
 COLUMNS = ["Use", "Orbit", "Sites", "Start |m| (muB)", "Confidence", "Why"]
 CONFIDENCE_COLORS = {"high": "#2e7d32", "medium": "#b26a00", "low": "#b71c1c"}
@@ -34,7 +35,7 @@ class SuggestionPanel(QWidget):
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
-        self.header = QLabel("Open a structure (File > Open, Ctrl+O) to get magnetic-site "
+        self.header = QLabel(f"Open a structure (File > Open, {shortcut_text('Ctrl+O')}) to get magnetic-site "
                              "suggestions.<br>F1 lists every key and mouse gesture.")
         self.header.setWordWrap(True)
         lay.addWidget(self.header)
@@ -138,7 +139,8 @@ class SuggestionPanel(QWidget):
             self.status.setText("Nothing checked.")
             return
         self.accepted.emit(items, self.magnitudes())
-        self.status.setText("Accepted: " + ", ".join(s.label for s in items) + ". Undo with Ctrl+Z.")
+        self.status.setText("Accepted: " + ", ".join(s.label for s in items)
+                            + f". Undo with {shortcut_text('Ctrl+Z')}.")
 
     def _skip(self) -> None:
         self.skipped.emit()

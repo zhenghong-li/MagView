@@ -5,7 +5,7 @@ OS-specific path, lookup and default lives here, and the rest of the package
 asks this module instead of testing ``sys.platform`` itself. Standard library
 only (tests/test_architecture.py), so core/, style/ and render/ may import it.
 
-Linux/WSL and native Windows are supported. macOS packaging is still planned.
+Linux/WSL, native Windows and macOS source launches are supported.
 
 Named ``osdeps``, not ``platform``: a module called ``platform`` shadows the
 standard library one whenever this directory is on ``sys.path`` (frozen builds,
@@ -22,6 +22,16 @@ from pathlib import Path
 
 VESTA_DIR_NAME = "VESTA-gtk3-x86_64"  # folder name of the Linux VESTA build
 PLATFORM = sys.platform
+
+
+def native_gui_workarounds() -> bool:
+    """The Cocoa viewport needs early GL setup and native trackpad input."""
+    return PLATFORM == "darwin"
+
+
+def gui_pixel_ratio(device_pixel_ratio: float) -> float:
+    """Scale Cocoa interaction distances and overlay spacing on Retina screens."""
+    return device_pixel_ratio if PLATFORM == "darwin" else 1.0
 
 
 def _env_dir(name: str, fallback: Path) -> Path:

@@ -214,6 +214,7 @@ def test_shortcut_reference_lists_every_key():
 
     from magview.gui.main_window import (COMMAND_KEYS, LOCK_KEYS, SHORTCUT_REFERENCE,
                                          shortcut_reference_html)
+    from magview.gui.shortcuts import shortcut_text
 
     keys_text = " ".join(k for _, entries in SHORTCUT_REFERENCE for k, _ in entries)
     tokens = set(keys_text.replace(",", " ").replace("/", " ").replace("+", " ").split())
@@ -222,7 +223,7 @@ def test_shortcut_reference_lists_every_key():
         name = QKeySequence(key).toString()
         assert name in tokens, f"{name} missing from the F1 reference"
     for combo in ("Ctrl+Z", "Ctrl+Y", "Ctrl+Shift+Z", "Ctrl+A", "Ctrl+O", "Ctrl+S", "Ctrl+Shift+S"):
-        assert combo in keys_text, combo
+        assert shortcut_text(combo) in keys_text, combo
     html = shortcut_reference_html()
     assert html.startswith("<table>") and "Layer mode" in html
 
