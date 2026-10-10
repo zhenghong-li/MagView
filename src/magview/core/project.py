@@ -106,6 +106,7 @@ def from_dict(data: dict) -> MagDocument:
         raise ProjectError("spin_axis must be a 3-vector")
     if not np.linalg.norm(spin_axis) > 0:
         raise ProjectError("spin_axis is the zero vector")
+    spin_axis = spin_axis / np.linalg.norm(spin_axis)  # the rest of MagView assumes a unit axis
     collinear = bool(data.get("collinear", True))
     if collinear and not mg.is_collinear(moments, spin_axis):
         raise ProjectError("collinear is true but moments_cartesian_muB are not all along "

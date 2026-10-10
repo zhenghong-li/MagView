@@ -156,3 +156,14 @@ def test_autosave_keyed_by_structure_not_file_name(load, tmp_path, monkeypatch):
     doc = MagDocument.new(nio)
     session = project.save(doc, tmp_path / "s.magview.json")
     assert project.autosave_path(project.load(session).crystal) == project.autosave_path(nio)
+
+
+def test_session_spin_axis_normalized_on_load(doc, tmp_path):
+    """A hand-edited spin_axis such as [0, 0, 2] loads as a unit vector (the GUI's
+    spin-axis selector compares against unit axes and would show the wrong one)."""
+    data = project.to_dict(doc)
+    data["spin_axis"] = [0.0, 0.0, 2.0]
+    path = tmp_path / "axis.magview.json"
+    path.write_text(json.dumps(data))
+    d2 = project.load(path)
+    assert np.allclose(d2.spin_axis, [0, 0, 1]) and np.allclose(d2.moments, doc.moments)
