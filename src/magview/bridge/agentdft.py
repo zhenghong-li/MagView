@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from magview import osdeps
 from magview.io.handoff import validate_handoff
 
 ENV_JOBS_DIR = "MAGVIEW_AGENTDFT_DIR"
@@ -60,7 +61,7 @@ def _now() -> str:
 class MockAgentDFTBridge(AgentDFTBridge):
     def __init__(self, root: str | Path | None = None) -> None:
         env = os.environ.get(ENV_JOBS_DIR)
-        self.root = Path(root or env or Path.home() / ".magview" / "agentdft_jobs")
+        self.root = Path(root or env or osdeps.data_dir() / "agentdft_jobs")
 
     def validate(self, handoff: dict) -> ValidationReport:
         errors = validate_handoff(handoff)

@@ -12,11 +12,9 @@ from pathlib import Path
 
 import numpy as np
 
+from magview.osdeps import has_display
+
 OSMESA_WINDOW = "vtkOSOpenGLRenderWindow"
-
-
-def has_display() -> bool:
-    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
 def configure_offscreen() -> None:

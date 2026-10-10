@@ -13,8 +13,9 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from magview import osdeps
+
 ENV_VESTA_DIR = "MAGVIEW_VESTA_DIR"
-VESTA_DIR_NAME = "VESTA-gtk3-x86_64"
 
 
 @dataclass(frozen=True)
@@ -247,8 +248,8 @@ def _looks_numeric(token: str) -> bool:
 def find_vesta_dir(start: str | os.PathLike | None = None) -> Path | None:
     """Locate a VESTA installation containing ``elements.ini``.
 
-    Order: ``$MAGVIEW_VESTA_DIR``; then ``<ancestor>/vesta_tools/VESTA-gtk3-x86_64``
-    for every ancestor of ``start`` (default: cwd) and of this package.
+    Order: ``$MAGVIEW_VESTA_DIR``; then the OS-specific candidates of
+    ``osdeps.vesta_candidates`` around ``start`` (default: cwd) and this package.
     """
     env = os.environ.get(ENV_VESTA_DIR)
     if env:
@@ -256,13 +257,7 @@ def find_vesta_dir(start: str | os.PathLike | None = None) -> Path | None:
         return p if (p / "elements.ini").is_file() else None
 
     roots = [Path(start) if start else Path.cwd(), Path(__file__).resolve()]
-    seen: set[Path] = set()
-    for root in roots:
-        for anc in [root, *root.parents]:
-            if anc in seen:
-                continue
-            seen.add(anc)
-            cand = anc / "vesta_tools" / VESTA_DIR_NAME
-            if (cand / "elements.ini").is_file():
-                return cand
+    for cand in osdeps.vesta_candidates(roots):
+        if (cand / "elements.ini").is_file():
+            return cand
     return None

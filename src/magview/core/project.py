@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 from pymatgen.core import Lattice, Structure
 
-from magview import __version__
+from magview import __version__, osdeps
 from magview.core import magnetic as mg
 from magview.core.canvas import Canvas
 from magview.core.document import MagDocument
@@ -142,12 +142,10 @@ def load(path: str | Path) -> MagDocument:
 
 
 def autosave_dir() -> Path:
-    """$MAGVIEW_AUTOSAVE_DIR, else $XDG_CACHE_HOME/magview/autosave (~/.cache when the
-    variable is unset or, per the XDG spec, not an absolute path)."""
+    """$MAGVIEW_AUTOSAVE_DIR, else ``autosave`` in the per-user cache
+    (osdeps.cache_dir: $XDG_CACHE_HOME/magview or ~/.cache/magview on Linux)."""
     env = os.environ.get(ENV_AUTOSAVE_DIR)
-    xdg = os.environ.get("XDG_CACHE_HOME", "")
-    cache = Path(xdg) if os.path.isabs(xdg) else Path.home() / ".cache"
-    base = Path(env) if env else cache / "magview" / "autosave"
+    base = Path(env) if env else osdeps.cache_dir() / "autosave"
     base.mkdir(parents=True, exist_ok=True)
     return base
 

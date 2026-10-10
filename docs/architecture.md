@@ -15,13 +15,19 @@ io/       pure Python           handoff build + JSON Schema/semantic validation
   |
 core/     numpy/pymatgen/spglib structure, images, bonds, canvas, document + history,
                                 moments, layers, patterns, stacking, minimal magnetic cell
+
+osdeps.py standard library      the only OS-specific code: per-user cache/data folders,
+                                display detection, VESTA install lookup
 ```
+
+One code base serves Linux/WSL, Windows and macOS. What differs per platform outside the code (system packages, launchers, packaging, installers) lives in `platforms/<os>/`; inside the code it lives in `osdeps.py` alone.
 
 `tests/test_architecture.py` enforces the import rules:
 - `core` imports nothing from `style`, `render`, `gui`, VTK, pyvista or Qt.
 - `io` and `bridge` import no `style`, `render`, `gui`, VTK, pyvista or Qt.
 - `style` imports no VTK and no Qt.
 - `render` imports no Qt.
+- `osdeps.py` imports only the standard library, and no other module tests `sys.platform` / `os.name`.
 
 As a result, every algorithm can be tested headlessly, and every PNG artifact comes from the same drawing code the GUI uses.
 

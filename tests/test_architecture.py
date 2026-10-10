@@ -1,4 +1,5 @@
-"""Layering rules: core/, io/ and bridge/ are GUI- and VTK-free; render/ is Qt-free."""
+"""Layering rules: core/, io/ and bridge/ are GUI- and VTK-free; render/ is Qt-free;
+osdeps.py (the only OS-specific module) uses the standard library alone."""
 
 import ast
 from pathlib import Path
@@ -40,4 +41,27 @@ def test_layer_imports(package):
             for forbidden in FORBIDDEN[package]:
                 if mod == forbidden or mod.startswith(forbidden + "."):
                     bad.append(f"{path.relative_to(SRC)} imports {mod}")
+    assert not bad, "\n".join(bad)
+
+
+def test_osdeps_is_stdlib_only():
+    """osdeps.py is imported by core/, style/ and render/, so it may use nothing but
+    the standard library (and must stay the single home of OS-specific code)."""
+    import sys
+
+    mods = imported_modules(SRC / "osdeps.py")
+    assert {m for m in mods if m.split(".")[0] not in sys.stdlib_module_names} == set()
+
+
+def test_no_os_checks_outside_osdeps():
+    """OS branches belong in osdeps.py; elsewhere they would scatter platform logic
+    over the shared code base again."""
+    bad = []
+    for path in sorted(SRC.rglob("*.py")):
+        if path.name == "osdeps.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for needle in ("sys.platform", "os.name ==", "platform.system("):
+            if needle in text:
+                bad.append(f"{path.relative_to(SRC)}: {needle}")
     assert not bad, "\n".join(bad)
