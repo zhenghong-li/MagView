@@ -22,6 +22,7 @@ from magview.core.species import element_symbol
 
 DEFAULT_SYMPREC = 1e-3  # Angstrom
 WRAP_TOL = 1e-8
+MIN_CELL_VOLUME = 1e-3  # Angstrom^3: below this the lattice is degenerate
 
 # Opt in to spglib's exception-based error handling (the legacy None-return mode
 # is deprecated and emits a warning on every call).
@@ -53,6 +54,29 @@ def _reject_magview_json(path: Path) -> None:
         raise StructureLoadError(
             f"{path.name} is a MagView AgentDFT handoff, not a crystal structure; its structures "
             "are in the input_cell, reference_cell and magnetic_cell fields")
+
+
+def _check_geometry(struct: Structure, symprec) -> float:
+    """Reject input that spglib cannot handle: NaN/inf lattice, coordinates or
+    tolerance crash its C code (a segfault, taking the GUI down) instead of raising.
+    Returns symprec as a float."""
+    try:
+        symprec = float(symprec)
+    except (TypeError, ValueError):
+        raise StructureLoadError(f"symmetry tolerance must be a number, got {symprec!r}") from None
+    if not (np.isfinite(symprec) and symprec > 0):
+        raise StructureLoadError(f"symmetry tolerance must be a positive number, got {symprec}")
+    lattice = np.asarray(struct.lattice.matrix, dtype=float)
+    if not np.isfinite(lattice).all():
+        raise StructureLoadError("the lattice contains non-finite values (NaN or infinity)")
+    volume = abs(float(np.linalg.det(lattice)))
+    if not volume > MIN_CELL_VOLUME:
+        raise StructureLoadError(f"degenerate lattice: cell volume {volume:.3g} A^3")
+    if len(struct) == 0:
+        raise StructureLoadError("the structure has no atoms")
+    if not np.isfinite(struct.frac_coords).all():
+        raise StructureLoadError("atomic coordinates contain non-finite values (NaN or infinity)")
+    return symprec
 
 
 @dataclass(frozen=True)
@@ -111,6 +135,7 @@ class CrystalStructure:
             raise DisorderedStructureError(
                 "structure has partial occupancies; order it first (e.g. pick one "
                 "configuration or build a supercell) before magnetic editing")
+        symprec = _check_geometry(struct, symprec)
         struct = struct.copy()
         frac = np.mod(struct.frac_coords, 1.0)
         frac[np.abs(frac - 1.0) < WRAP_TOL] = 0.0

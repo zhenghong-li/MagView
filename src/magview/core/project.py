@@ -21,7 +21,7 @@ from magview import __version__
 from magview.core import magnetic as mg
 from magview.core.canvas import Canvas
 from magview.core.document import MagDocument
-from magview.core.structure import CrystalStructure
+from magview.core.structure import CrystalStructure, StructureLoadError
 
 FORMAT = "magview-project"
 VERSION = 1
@@ -81,7 +81,11 @@ def from_dict(data: dict) -> MagDocument:
     except (TypeError, ValueError) as exc:
         raise ProjectError(f"invalid structure: {exc}") from exc
     source = Path(data["source_file"]) if data.get("source_file") else None
-    crystal = CrystalStructure.from_pymatgen(struct, source=source, symprec=data.get("symprec", 1e-3))
+    try:
+        crystal = CrystalStructure.from_pymatgen(struct, source=source,
+                                                 symprec=data.get("symprec", 1e-3))
+    except StructureLoadError as exc:
+        raise ProjectError(f"invalid structure: {exc}") from exc
     try:
         canvas = Canvas.build(crystal, data["canvas_matrix"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -93,6 +97,8 @@ def from_dict(data: dict) -> MagDocument:
     if raw.size % 3:
         raise ProjectError(f"moments_cartesian_muB has {raw.size} values, not a multiple of 3")
     moments = raw.reshape(-1, 3)
+    if not np.isfinite(moments).all():
+        raise ProjectError("moments_cartesian_muB contains non-finite values (NaN or infinity)")
     if len(moments) != len(canvas):
         raise ProjectError(f"{len(moments)} moments for a canvas of {len(canvas)} sites")
     magnetic = np.zeros(len(crystal), bool)
@@ -101,11 +107,13 @@ def from_dict(data: dict) -> MagDocument:
     if site_magnitude.shape != (len(crystal),):
         raise ProjectError(f"site_magnitude has {site_magnitude.size} entries for "
                            f"{len(crystal)} input sites")
+    if not (np.isfinite(site_magnitude).all() and (site_magnitude >= 0).all()):
+        raise ProjectError("site_magnitude must be finite and non-negative")
     spin_axis = np.asarray(data.get("spin_axis", [0, 0, 1]), dtype=float)
     if spin_axis.shape != (3,):
         raise ProjectError("spin_axis must be a 3-vector")
-    if not np.linalg.norm(spin_axis) > 0:
-        raise ProjectError("spin_axis is the zero vector")
+    if not (np.isfinite(spin_axis).all() and np.linalg.norm(spin_axis) > 0):
+        raise ProjectError("spin_axis must be a finite, non-zero 3-vector")
     spin_axis = spin_axis / np.linalg.norm(spin_axis)  # the rest of MagView assumes a unit axis
     collinear = bool(data.get("collinear", True))
     if collinear and not mg.is_collinear(moments, spin_axis):

@@ -182,3 +182,24 @@ def test_autosave_dir_follows_xdg_cache_home(tmp_path, monkeypatch):
     assert project.autosave_dir() == tmp_path / "home" / ".cache" / "magview" / "autosave"
     monkeypatch.setenv(project.ENV_AUTOSAVE_DIR, str(tmp_path / "explicit"))
     assert project.autosave_dir() == tmp_path / "explicit"
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda d: d["moments_cartesian_muB"][0].__setitem__(2, float("nan")), "non-finite"),
+    (lambda d: (d.__setitem__("collinear", False),
+                d["moments_cartesian_muB"][0].__setitem__(0, float("inf"))), "non-finite"),
+    (lambda d: d["site_magnitude"].__setitem__(0, float("nan")), "site_magnitude"),
+    (lambda d: d["site_magnitude"].__setitem__(0, -1.0), "site_magnitude"),
+    (lambda d: d.__setitem__("spin_axis", [float("nan"), 0.0, 1.0]), "spin_axis"),
+    (lambda d: d["structure"]["frac_coords"][0].__setitem__(0, float("nan")), "invalid structure"),
+    (lambda d: d.__setitem__("symprec", -1.0), "invalid structure"),
+])
+def test_session_rejects_non_finite_values(doc, tmp_path, mutate, message):
+    """Corrupt sessions: NaN moments/magnitudes used to load (or were rejected with a
+    misleading message), and NaN geometry crashed the process inside spglib."""
+    data = json.loads(json.dumps(project.to_dict(doc)))
+    mutate(data)
+    path = tmp_path / "bad.magview.json"
+    path.write_text(json.dumps(data))
+    with pytest.raises(project.ProjectError, match=message):
+        project.load(path)

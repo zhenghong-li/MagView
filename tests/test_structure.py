@@ -103,3 +103,39 @@ def test_magview_json_files_get_a_clear_error(tmp_path):
     other.write_text(json.dumps({"foo": 1}))
     with pytest.raises(StructureLoadError, match=r"not a structure file .*missing field 'lattice'"):
         CrystalStructure.from_file(other)
+
+
+NON_FINITE_PROBE = """
+import sys
+from pymatgen.core import Lattice, Structure
+from magview.core.structure import CrystalStructure, StructureLoadError
+nan, inf = float("nan"), float("inf")
+cases = {
+    "lattice NaN": (Lattice([[nan, 0, 0], [0, 4, 0], [0, 0, 4]]), [[0, 0, 0]], 1e-3),
+    "degenerate lattice": (Lattice([[1, 0, 0], [2, 0, 0], [0, 0, 4]]), [[0, 0, 0]], 1e-3),
+    "frac NaN": (Lattice.cubic(4), [[nan, 0, 0]], 1e-3),
+    "frac inf": (Lattice.cubic(4), [[inf, 0, 0]], 1e-3),
+    "symprec NaN": (Lattice.cubic(4), [[0, 0, 0]], nan),
+    "symprec negative": (Lattice.cubic(4), [[0, 0, 0]], -1.0),
+}
+for name, (lat, frac, symprec) in cases.items():
+    try:
+        CrystalStructure.from_pymatgen(Structure(lat, ["Fe"] * len(frac), frac), symprec=symprec)
+        print(name, "ACCEPTED", flush=True)
+    except StructureLoadError as exc:
+        print(name, "rejected:", exc, flush=True)
+"""
+
+
+def test_non_finite_geometry_rejected_instead_of_crashing():
+    """NaN/inf lattices, coordinates or tolerances (e.g. a corrupt session) reached
+    spglib's C code and killed the process (SIGSEGV), GUI included. Run in a
+    subprocess so a regression fails this test instead of the whole session."""
+    import subprocess
+    import sys
+
+    proc = subprocess.run([sys.executable, "-c", NON_FINITE_PROBE], capture_output=True,
+                          text=True, timeout=120)
+    assert proc.returncode == 0, f"crashed with exit code {proc.returncode}: {proc.stdout}"
+    lines = proc.stdout.strip().splitlines()
+    assert len(lines) == 6 and all("rejected:" in line for line in lines), proc.stdout
