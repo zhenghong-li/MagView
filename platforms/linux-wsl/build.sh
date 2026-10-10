@@ -20,7 +20,7 @@ NAME="MagView-$VERSION-linux-x86_64"
 STAGE="build/stage/$NAME"
 echo "== building $NAME"
 
-rm -rf build/venv build/work build/dist build/stage
+rm -rf build/venv build/work build/dist build/stage build/selftest build/selftest.log build/smoke.png
 python3 -m venv build/venv
 build/venv/bin/pip install --quiet --disable-pip-version-check -r requirements.txt -r requirements-build.txt
 build/venv/bin/pip install --quiet --disable-pip-version-check --no-deps .

@@ -32,10 +32,15 @@ def main(argv=None) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     import os
+    import shutil
 
     # Hermetic run: autosaves, mock jobs and QSettings (window geometry/dock state,
     # arrow settings) live under --out, never in the developer's real directories or
-    # an inherited shared directory (the autosave checks count files per run).
+    # an inherited shared directory (the autosave checks count files per run). They
+    # start empty: a previous run into the same --out would otherwise leave an autosave
+    # behind, and its recovery prompt would derail this run.
+    for state in ("autosave", "agentdft_jobs", "xdg_config"):
+        shutil.rmtree(out / state, ignore_errors=True)
     os.environ["MAGVIEW_AUTOSAVE_DIR"] = str(out / "autosave")
     os.environ["MAGVIEW_AGENTDFT_DIR"] = str(out / "agentdft_jobs")
     os.environ["XDG_CONFIG_HOME"] = str(out / "xdg_config")

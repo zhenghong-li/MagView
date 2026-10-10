@@ -192,3 +192,22 @@ def test_selftest_flag_dispatches_to_the_gui_selftest(monkeypatch, tmp_path):
     help_text = subprocess.run([sys.executable, "-m", "magview", "--help"], capture_output=True,
                                text=True, timeout=60).stdout
     assert "--selftest" not in help_text
+
+
+@pytest.mark.gui
+@pytest.mark.skipif(shutil.which("xvfb-run") is None, reason="xvfb-run not installed")
+def test_selftest_rerun_into_same_out_dir(tmp_path, monkeypatch):
+    """A second self-test into the same --out found the first run's autosave, and the
+    recovery prompt failed the run (seen when the release build ran twice)."""
+    from magview.core import project
+    from magview.core.document import MagDocument
+    from magview.core.structure import CrystalStructure
+
+    monkeypatch.setenv("MAGVIEW_AUTOSAVE_DIR", str(tmp_path / "autosave"))
+    doc = MagDocument.new(CrystalStructure.from_file(DATA / "NiO.cif"))
+    project.autosave(doc)  # what an earlier run leaves behind (newer than the CIF)
+    proc = run_subprocess(
+        ["xvfb-run", "-a", "-s", "-screen 0 1600x1000x24", sys.executable, "-m",
+         "magview.gui.selftest", str(DATA / "NiO.cif"), "--out", str(tmp_path), "--phase1-only"],
+        timeout=300, env=gui_env())
+    assert proc.returncode == 0 and "[FAIL]" not in proc.stdout, proc.stdout + proc.stderr
