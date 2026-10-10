@@ -1,4 +1,4 @@
-"""scripts/setup_system_deps.sh: list, check and idempotent install."""
+"""platforms/linux-wsl/setup_system_deps.sh: list, check and idempotent install."""
 
 import os
 import subprocess

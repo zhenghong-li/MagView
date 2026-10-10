@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Install MagView's system packages (idempotent; run as root).
 #
-#   scripts/setup_system_deps.sh          install whatever is missing (no-op if complete)
-#   scripts/setup_system_deps.sh --check  report missing packages; exit 1 if any
-#   scripts/setup_system_deps.sh --list   print the package list (for a Dockerfile)
+#   platforms/linux-wsl/setup_system_deps.sh          install whatever is missing (no-op if complete)
+#   platforms/linux-wsl/setup_system_deps.sh --check  report missing packages; exit 1 if any
+#   platforms/linux-wsl/setup_system_deps.sh --list   print the package list (for a Dockerfile)
 #
-# The package list lives in scripts/system-packages.txt next to this script.
+# The package list lives in platforms/linux-wsl/system-packages.txt next to this script.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 

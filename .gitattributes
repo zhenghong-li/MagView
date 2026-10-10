@@ -1,0 +1,13 @@
+# Line endings: LF in the repository and in checkouts on every OS, so scripts and
+# docs behave the same on Linux/WSL, Windows and macOS.
+* text=auto eol=lf
+# Windows-only scripts keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# Test structures stay byte-for-byte as received (Cs3V9Te13_300K.cif is CRLF).
+tests/data/*.cif -text
+# Binary assets.
+*.png binary
+*.ico binary
+*.icns binary

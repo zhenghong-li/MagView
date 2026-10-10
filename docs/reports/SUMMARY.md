@@ -27,7 +27,7 @@ bc0b7a3 Phase 0: foundations - structure loading, VESTA-like rendering, GUI shel
 
 ## Running it on your host
 - **WSL (WSLg):**
-  1. `sudo scripts/setup_system_deps.sh`
+  1. `sudo platforms/linux-wsl/setup_system_deps.sh`
   2. `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/pip install -e . --no-deps`
   3. `QT_QPA_PLATFORM=xcb .venv/bin/python -m magview tests/data/Cs3V9Te13_300K.cif`
 
@@ -60,7 +60,7 @@ bc0b7a3 Phase 0: foundations - structure loading, VESTA-like rendering, GUI shel
 - Smaller ones: VTK text garbles `|`; pyvista's `screenshot()` returns a cached frame; the centered arrow lagged the cursor; red arrows merged into red V and O atoms.
 
 ## For you to do or decide
-- **Dockerfile:** the final package list is `scripts/system-packages.txt` (37 packages, unchanged since Phase 0). `scripts/setup_system_deps.sh --list` prints it.
+- **Dockerfile:** the final package list is `platforms/linux-wsl/system-packages.txt` (37 packages, unchanged since Phase 0). `platforms/linux-wsl/setup_system_deps.sh --list` prints it.
 - **Calibrate against VESTA on the host:** ball-and-stick radius scale (currently 0.5, inferred from `ATOMP`), parallel vs perspective projection, default orientation, bicolor bonds. Checklist in `docs/vesta_reference.md`.
 - **Your Cs3V9Te13 results:**
   - V is suggested at 2.4 μB, flagged low confidence because the average valence is V^+2.56.

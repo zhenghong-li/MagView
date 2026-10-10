@@ -2,7 +2,7 @@
 
 The preflight renders one pixel offscreen before any test runs. If the system
 OpenGL/OSMesa libraries are missing (e.g. after the container was recreated),
-the whole session stops with a pointer to scripts/setup_system_deps.sh instead
+the whole session stops with a pointer to platforms/linux-wsl/setup_system_deps.sh instead
 of failing in confusing ways later.
 """
 
@@ -20,7 +20,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "tests" / "data"
-SETUP_SCRIPT = ROOT / "scripts" / "setup_system_deps.sh"
+SETUP_SCRIPT = ROOT / "platforms" / "linux-wsl" / "setup_system_deps.sh"
 
 PREFLIGHT = """
 from magview.render.offscreen import make_plotter

@@ -14,14 +14,14 @@ MagView is built in phases; see `docs/reports/`. **Status: all phases (0–5) do
 ## Setup (Ubuntu 24.04 container or WSL)
 
 ```bash
-sudo scripts/setup_system_deps.sh            # idempotent; installs scripts/system-packages.txt (as root: drop sudo)
+sudo platforms/linux-wsl/setup_system_deps.sh   # idempotent apt install (as root: drop sudo)
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt    # every package pinned
+.venv/bin/pip install -r requirements.txt       # every package pinned
 .venv/bin/pip install -e . --no-deps
-.venv/bin/python -m pytest -q                # aborts early with a hint if system libs are missing
+.venv/bin/python -m pytest -q                   # aborts early with a hint if system libs are missing
 ```
 
-`scripts/setup_system_deps.sh --check` reports any missing system packages. `--list` prints the list, which can be mirrored into a Dockerfile. Packages installed with apt live in the container layer, so run the script again after the container is recreated. The venv in the workspace survives the rebuild, but it needs those libraries.
+`platforms/linux-wsl/setup_system_deps.sh --check` reports any missing system packages. `--list` prints the list, which can be mirrored into a Dockerfile. Packages installed with apt live in the container layer, so run the script again after the container is recreated. The venv in the workspace survives the rebuild, but it needs those libraries.
 
 On Windows or macOS hosts no system packages are needed; just create the venv and install from `requirements.txt`.
 
@@ -78,12 +78,13 @@ MagView reads element colors and radii (`elements.ini`) and bond rules plus disp
 ## Layout
 
 ```
-src/magview/core     pure algorithms (numpy, pymatgen, spglib)
-src/magview/style    VESTA ini parsers, element styles, render theme
-src/magview/render   pyvista scene (no Qt), offscreen PNG
-src/magview/gui      PySide6 GUI
-tests/               pytest; tests/data holds the test structures
-docs/                architecture, UX spec, VESTA notes, phase reports
-artifacts/phaseN/    rendered evidence for each phase
-scripts/             system deps, gallery, test-structure generator
+src/magview/          one code base for every platform
+  core/ io/ bridge/   pure algorithms, handoff, AgentDFT bridge (no Qt, no VTK)
+  style/ render/      VESTA ini parsers and theme; pyvista scene (no Qt), offscreen PNG
+  gui/                PySide6 GUI
+platforms/linux-wsl/  system packages, setup script (Linux and WSL)
+tests/                pytest; tests/data holds the test structures
+docs/                 architecture, UX spec, VESTA notes, handoff format, phase reports
+artifacts/phaseN/     rendered evidence for each phase
+scripts/              dev tools: artifact galleries, test-structure generator
 ```

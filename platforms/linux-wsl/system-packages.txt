@@ -1,5 +1,5 @@
 # System (Debian/Ubuntu 24.04) packages required by MagView in a headless container.
-# Single source of truth: read by scripts/setup_system_deps.sh and mirrored into
+# Single source of truth: read by platforms/linux-wsl/setup_system_deps.sh and mirrored into
 # the sandbox image Dockerfile. One package per line; '#' starts a comment.
 
 # --- Python ---

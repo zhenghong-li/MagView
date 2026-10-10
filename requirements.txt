@@ -1,6 +1,6 @@
 # Exact pins of every Python package (full freeze, Python 3.12, 2026-10-09).
 # Install: pip install -r requirements.txt && pip install -e . --no-deps
-# System libraries: sudo scripts/setup_system_deps.sh
+# System libraries: sudo platforms/linux-wsl/setup_system_deps.sh
 attrs==26.1.0
 bibtexparser==1.4.4
 certifi==2026.7.22
