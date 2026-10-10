@@ -24,6 +24,7 @@ The machine-readable schema is `src/magview/io/handoff.schema.json` (JSON Schema
 | `dft_hints.vasp` | `ISPIN: 2`, `LNONCOLLINEAR`, `MAGMOM` (run-length encoded, e.g. `6*0 9*2.4 9*-2.4 26*0`), `SAXIS` (non-collinear: `[0,0,1]`, so the MAGMOM triples are Cartesian), `species_order`, `species_counts` |
 
 ## Consistency rules (beyond the schema)
+- Every number is finite (no `NaN` or `Infinity`, which Python's `json` would otherwise read and write); saved files are strict JSON.
 - The lengths of `frac_coords`, `labels`, `parent_input_site` and `moments.vectors` equal the number of magnetic sites.
 - `magnetic_cell.lattice == supercell_matrix @ reference_cell.lattice` (1e-4 Å), and — when `supercell_matrix_input` is not null — `magnetic_cell.lattice == supercell_matrix_input @ input_cell.lattice` (1e-4 Å).
 - `unfolding.supercell_matrix == supercell_matrix` (exact, integer matrices).

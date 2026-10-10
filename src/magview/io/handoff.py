@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import json
+import math
 from importlib import resources
 from pathlib import Path
 
@@ -196,6 +197,18 @@ def build_handoff(doc: MagDocument, cell: MagneticCell | None = None, axis: str 
     }
 
 
+def _non_finite(value, path: str = "") -> list[str]:
+    """JSON paths of NaN/infinite numbers (Python's json reads and writes them, but
+    they are not JSON, and NaN slips through every tolerance comparison)."""
+    if isinstance(value, float):
+        return [] if math.isfinite(value) else [path or "(root)"]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in _non_finite(v, f"{path}/{k}" if path else str(k))]
+    if isinstance(value, list):
+        return [p for i, v in enumerate(value) for p in _non_finite(v, f"{path}/{i}")]
+    return []
+
+
 def validate_handoff(data: dict) -> list[str]:
     """All problems found (empty list = valid): JSON Schema first, then consistency."""
     import jsonschema
@@ -205,6 +218,9 @@ def validate_handoff(data: dict) -> list[str]:
                               key=lambda e: list(e.path))]
     if errors:
         return errors
+    bad = _non_finite(data)
+    if bad:
+        return [f"non-finite number (NaN or infinity) at {p}" for p in bad]
     mc, ref = data["magnetic_cell"], data["reference_cell"]
     n = len(mc["species"])
     for key in ("frac_coords", "labels", "parent_input_site"):
@@ -270,6 +286,6 @@ def save_handoff(data: dict, path: str | Path) -> Path:
         raise HandoffError(errors)
     path = Path(path)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=1))
+    tmp.write_text(json.dumps(data, indent=1, allow_nan=False))  # strict JSON for any consumer
     tmp.replace(path)
     return path

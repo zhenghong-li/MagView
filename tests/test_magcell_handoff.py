@@ -23,7 +23,8 @@ from magview.core.patterns import match_layer
 from magview.core.stacking import fm_reference, stacking_library
 from magview.core.structure import CrystalStructure
 from magview.core.suggest import ElementRuleSuggester
-from magview.io.handoff import build_handoff, expand_magmom, magmom_string, validate_handoff
+from magview.io.handoff import (HandoffError, build_handoff, expand_magmom, magmom_string,
+                                save_handoff, validate_handoff)
 
 
 # --- helpers ---------------------------------------------------------------------
@@ -327,3 +328,28 @@ def test_bridge_env_root(handoff, tmp_path, monkeypatch):
     monkeypatch.setenv("MAGVIEW_AGENTDFT_DIR", str(tmp_path / "envjobs"))
     t = MockAgentDFTBridge().submit(handoff)
     assert (tmp_path / "envjobs" / t.job_id / "job.json").is_file()
+
+
+def test_handoff_rejects_non_finite_numbers(load, tmp_path):
+    """NaN in coordinates or the input lattice passed validation (every tolerance
+    comparison is False for NaN); elsewhere it was caught only by accident."""
+    import copy
+
+    doc = MagDocument.new(load("NiO"))
+    doc.accept_suggestions([s for s in ElementRuleSuggester().suggest(doc.crystal).items
+                            if s.candidate], {})
+    h = build_handoff(doc, minimal_magnetic_cell(doc))
+    assert validate_handoff(h) == []
+    for keys in (("magnetic_cell", "frac_coords", 0, 1), ("input_cell", "lattice", 2, 2),
+                 ("reference_cell", "frac_coords", 0, 0), ("moments", "vectors", 0, 2)):
+        for bad in (float("nan"), float("inf")):
+            x = copy.deepcopy(h)
+            node = x
+            for k in keys[:-1]:
+                node = node[k]
+            node[keys[-1]] = bad
+            errors = validate_handoff(x)
+            assert errors == [f"non-finite number (NaN or infinity) at {'/'.join(map(str, keys))}"]
+            with pytest.raises(HandoffError):
+                save_handoff(x, tmp_path / "bad.json")
+    assert not (tmp_path / "bad.json").exists()
