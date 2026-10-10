@@ -104,9 +104,12 @@ src/magview/          one code base for every platform
   gui/                PySide6 GUI
   osdeps.py           the only OS-specific code (folders, display, VESTA lookup)
 platforms/linux-wsl/  system packages, setup script, release build script (Linux and WSL)
+platforms/windows/    Windows build files (planned)
+platforms/macos/      macOS build files (planned)
 packaging/            PyInstaller spec, launcher and license collection shared by all platforms
 tests/                pytest; tests/data holds the test structures
 docs/                 architecture, UX spec, VESTA notes, handoff format, phase reports
+docs/plans/           Windows and macOS build plans
 artifacts/phaseN/     rendered evidence for each phase
 scripts/              dev tools: artifact galleries, test-structure generator
 ```
