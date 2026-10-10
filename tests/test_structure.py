@@ -6,6 +6,8 @@ from pymatgen.core import Lattice, Structure
 
 from magview.core.structure import CrystalStructure, DisorderedStructureError, StructureLoadError
 
+from conftest import DATA
+
 EXPECTED_SG = {
     "Fe_bcc": (229, "Im-3m"),
     "NiO": (225, "Fm-3m"),
@@ -79,3 +81,25 @@ def test_wraps_coordinates():
     s = Structure(Lattice.cubic(3.0), ["Fe"], [[1.0, -0.25, 2.5]])
     c = CrystalStructure.from_pymatgen(s)
     assert np.allclose(c.frac_coords, [[0.0, 0.75, 0.5]])
+
+
+def test_magview_json_files_get_a_clear_error(tmp_path):
+    """A session or handoff given where a structure is expected used to fail with
+    pymatgen's bare KeyError text ("could not read x.json: 'lattice'")."""
+    import json
+
+    from magview.core import project
+    from magview.core.document import MagDocument
+
+    doc = MagDocument.new(CrystalStructure.from_file(DATA / "NiO.cif"))
+    session = project.save(doc, tmp_path / "nio.magview.json")
+    with pytest.raises(StructureLoadError, match="is a MagView session"):
+        CrystalStructure.from_file(session)
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text(json.dumps({"schema": "magview.handoff", "input_cell": {}}))
+    with pytest.raises(StructureLoadError, match="AgentDFT handoff"):
+        CrystalStructure.from_file(handoff)
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps({"foo": 1}))
+    with pytest.raises(StructureLoadError, match=r"not a structure file .*missing field 'lattice'"):
+        CrystalStructure.from_file(other)

@@ -8,6 +8,7 @@ to sites by their index in this input cell.
 
 from __future__ import annotations
 
+import json
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,25 @@ class DisorderedStructureError(StructureLoadError):
     pass
 
 
+def _reject_magview_json(path: Path) -> None:
+    """MagView's own JSON files are not structures; say what they are instead of
+    letting pymatgen fail with an opaque KeyError."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return  # not JSON we know: let pymatgen report it
+    if not isinstance(data, dict):
+        return
+    if data.get("format") == "magview-project":
+        raise StructureLoadError(
+            f"{path.name} is a MagView session, not a crystal structure: open it in the MagView "
+            "GUI (File > Open), which recognizes sessions by the .magview.json extension")
+    if data.get("schema") == "magview.handoff":
+        raise StructureLoadError(
+            f"{path.name} is a MagView AgentDFT handoff, not a crystal structure; its structures "
+            "are in the input_cell, reference_cell and magnetic_cell fields")
+
+
 @dataclass(frozen=True)
 class SymmetryInfo:
     number: int
@@ -60,6 +80,8 @@ class CrystalStructure:
         path = Path(path)
         if not path.is_file():
             raise StructureLoadError(f"file not found: {path}")
+        if path.suffix.lower() == ".json":
+            _reject_magview_json(path)
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -76,6 +98,9 @@ class CrystalStructure:
         except StructureLoadError:
             raise
         except Exception as exc:  # pymatgen raises many exception types
+            if isinstance(exc, KeyError):  # str(KeyError) is just the quoted key name
+                raise StructureLoadError(f"could not read {path}: not a structure file pymatgen "
+                                         f"recognizes (missing field {exc})") from exc
             raise StructureLoadError(f"could not read {path}: {exc}") from exc
         return cls.from_pymatgen(struct, source=path, symprec=symprec)
 
