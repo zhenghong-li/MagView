@@ -11,6 +11,37 @@ MagView is a real-time crystal-structure editor modeled on VESTA, with an intera
 
 **Status: version 0.1.0, packaged for Linux/WSL, with native source support for Windows and macOS (Apple Silicon and Intel)** (see below). Release notes: `CHANGELOG.md`. It was built in phases; see `docs/reports/`. Features: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing, session files, the layer editor with rule-based completion, inter-layer stacking, and the **minimal magnetic supercell + AgentDFT handoff** (mock bridge). Phase reports: `docs/reports/phase0.md` … `phase5.md`; handoff format: `docs/handoff_format.md`.
 
+## Platform support
+| Platform | Status |
+|---|---|
+| Linux / WSL (x86_64) | released: tarball on the Releases page |
+| Windows 10/11 (x64) | native source: [Windows instructions](platforms/windows/README.md) |
+| macOS 15+ (Apple Silicon and Intel) | native source: [macOS instructions](platforms/macos/README.md); packaged DMG planned: `docs/plans/macos-build.md` |
+
+## Native Windows
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File platforms\windows\setup.ps1
+.\platforms\windows\run.cmd tests\data\NiO.cif
+```
+
+Uses native 64-bit Python 3.13 and a separate `.venv-windows`. On first launch,
+`run.cmd` runs setup automatically if the environment is missing. See
+[Windows source setup and tests](platforms/windows/README.md).
+
+## Native macOS
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e . --no-deps
+.venv/bin/python -m magview tests/data/NiO.cif
+```
+
+Runs natively on macOS 15+ (Apple Silicon and Intel): Retina rendering,
+trackpad pinch/two-finger zoom, and Command-key shortcut labels. See
+[macOS source setup](platforms/macos/README.md). A signed, notarized DMG is
+planned in `docs/plans/macos-build.md`.
+
 ## Download and run (Linux / WSL)
 
 Get `MagView-<version>-linux-x86_64.tar.gz` from the [Releases page](https://github.com/zhenghong-li/MagView/releases); nothing else to install (Python, Qt, VTK and pymatgen are inside):
@@ -22,12 +53,6 @@ cd MagView-0.1.0-linux-x86_64 && ./magview examples/NiO.cif
 ```
 
 Needs x86_64 Linux with glibc 2.39+ (Ubuntu 24.04+; on Windows: WSL 2 with WSLg). See `README.txt` in the download for details.
-
-| Platform | Status |
-|---|---|
-| Linux / WSL (x86_64) | released: tarball on the Releases page |
-| Windows 10/11 (x64) | native source: [Windows instructions](platforms/windows/README.md) |
-| macOS 15+ (Apple Silicon and Intel) | native source: [macOS instructions](platforms/macos/README.md); packaged DMG planned: `docs/plans/macos-build.md` |
 
 ## Develop from source (Ubuntu 24.04 container or WSL)
 
@@ -42,29 +67,6 @@ python3 -m venv .venv
 `platforms/linux-wsl/setup_system_deps.sh --check` reports any missing system packages. `--list` prints the list, which can be mirrored into a Dockerfile. Packages installed with apt live in the container layer, so run the script again after the container is recreated. The venv in the workspace survives the rebuild, but it needs those libraries.
 
 Build the release tarball (fresh build venv, PyInstaller, GUI self-test of the packaged app): `platforms/linux-wsl/build.sh` writes `dist/MagView-<version>-linux-x86_64.tar.gz`. Packaged builds go to GitHub Releases, never into git.
-
-## Native Windows
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File platforms\windows\setup.ps1
-.\platforms\windows\run.cmd tests\data\NiO.cif
-```
-
-Uses native 64-bit Python 3.13 and a separate `.venv-windows`. On first launch,
-`run.cmd` runs setup automatically if the environment is missing. See
-[Windows source setup and tests](platforms/windows/README.md).
-## Native macOS
-
-```sh
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/pip install -e . --no-deps
-.venv/bin/python -m magview tests/data/NiO.cif
-```
-
-Runs natively on macOS 15+ (Apple Silicon and Intel): Retina rendering,
-trackpad pinch/two-finger zoom, and Command-key shortcut labels. See
-[macOS source setup](platforms/macos/README.md). A signed, notarized DMG is
-planned in `docs/plans/macos-build.md`.
 
 ## Usage
 
@@ -136,7 +138,6 @@ docs/plans/           Windows and macOS build plans
 artifacts/phaseN/     rendered evidence for each phase
 scripts/              dev tools: artifact galleries, test-structure generator
 ```
-
 
 AI assistance is credited through `Co-authored-by` trailers in commit messages.
 
