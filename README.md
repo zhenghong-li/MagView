@@ -9,7 +9,7 @@ MagView is a real-time crystal-structure editor modeled on VESTA, with an intera
 3. You choose how the layers stack.
 4. It finds the minimal magnetic supercell and writes a JSON handoff for an AgentDFT backend.
 
-**Status: version 0.1.0, packaged for Linux/WSL, with native Windows source support; macOS is planned** (see below). It was built in phases; see `docs/reports/`. Features: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing, session files, the layer editor with rule-based completion, inter-layer stacking, and the **minimal magnetic supercell + AgentDFT handoff** (mock bridge). Phase reports: `docs/reports/phase0.md` … `phase5.md`; handoff format: `docs/handoff_format.md`.
+**Status: version 0.1.0, packaged for Linux/WSL, with native source support for Windows and macOS (Apple Silicon and Intel)** (see below). Release notes: `CHANGELOG.md`. It was built in phases; see `docs/reports/`. Features: structure loading, VESTA-like rendering, editing canvas, selection, undo/redo, magnetic-site suggestions, moment editing, session files, the layer editor with rule-based completion, inter-layer stacking, and the **minimal magnetic supercell + AgentDFT handoff** (mock bridge). Phase reports: `docs/reports/phase0.md` … `phase5.md`; handoff format: `docs/handoff_format.md`.
 
 ## Download and run (Linux / WSL)
 
@@ -27,7 +27,7 @@ Needs x86_64 Linux with glibc 2.39+ (Ubuntu 24.04+; on Windows: WSL 2 with WSLg)
 |---|---|
 | Linux / WSL (x86_64) | released: tarball on the Releases page |
 | Windows 10/11 (x64) | native source: [Windows instructions](platforms/windows/README.md) |
-| macOS 12+ (Apple Silicon and Intel) | planned: `docs/plans/macos-build.md` |
+| macOS 15+ (Apple Silicon and Intel) | native source: [macOS instructions](platforms/macos/README.md); packaged DMG planned: `docs/plans/macos-build.md` |
 
 ## Develop from source (Ubuntu 24.04 container or WSL)
 
@@ -53,7 +53,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File platforms\windows\setup.ps1
 Uses native 64-bit Python 3.13 and a separate `.venv-windows`. On first launch,
 `run.cmd` runs setup automatically if the environment is missing. See
 [Windows source setup and tests](platforms/windows/README.md).
-macOS native builds remain planned in `docs/plans/`.
+## Native macOS
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e . --no-deps
+.venv/bin/python -m magview tests/data/NiO.cif
+```
+
+Runs natively on macOS 15+ (Apple Silicon and Intel): Retina rendering,
+trackpad pinch/two-finger zoom, and Command-key shortcut labels. See
+[macOS source setup](platforms/macos/README.md). A signed, notarized DMG is
+planned in `docs/plans/macos-build.md`.
 
 ## Usage
 
